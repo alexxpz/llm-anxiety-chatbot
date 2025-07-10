@@ -1,0 +1,2506 @@
+Exploring The Potential of Large Language Models for Assisting with Mental
+Health Diagnostic Assessments
+The Depression and Anxiety Case
+KAUSHIK ROY, Artificial Intelligence Institute University of South Carolina, USA
+HARSHUL SURANA, Indian Institute of Research and Science, Bhopal, India
+DARSSAN ESWARAMOORTHI, Artificial Intelligence Institute University of South Carolina, USA
+YUXIN ZI, Artificial Intelligence Institute University of South Carolina, USA
+VEDANT PALIT, Indian Institute of Technology, Kharagpur, India
+RITVIK GARIMELLA, Artificial Intelligence Institute University of South Carolina, USA
+AMIT SHETH, Artificial Intelligence Institute University of South Carolina, USA
+ABSTRACT
+Large language models (LLMs) are increasingly attracting the attention of healthcare professionals for their potential to
+assist in diagnostic assessments, which could alleviate the strain on the healthcare system caused by a high patient
+load and a shortage of providers. For LLMs to be effective in supporting diagnostic assessments, it is essential that
+they closely replicate the standard diagnostic procedures used by clinicians. In this paper, we specifically examine the
+diagnostic assessment processes described in the Patient Health Questionnaire-9 (PHQ-9) for major depressive disorder
+(MDD) and the Generalized Anxiety Disorder-7 (GAD-7) questionnaire for generalized anxiety disorder (GAD). We
+investigate various prompting and fine-tuning techniques to guide both proprietary and open-source LLMs in adhering
+to these processes, and we evaluate the agreement between LLM-generated diagnostic outcomes and expert-validated
+ground truth. For fine-tuning, we utilize the Mentalllama and Llama models, while for prompting, we experiment with
+proprietary models like GPT-3.5 and GPT-4o, as well as open-source models such as llama-3.1-8b and mixtral-8x7b.
+Software Availability. We make all software artifacts available at this Github link1
+Institutional Review Board (IRB). This study does not require approval from the Institutional Review Board (IRB).
+It involves using clinician-annotated social media posts, authorized for research purposes. The primary objective is
+to evaluate the effectiveness of LLMs that incorporate diagnostic criteria for major depressive disorder and general
+anxiety disorder for assisting with mental health assessments.
+1
+INTRODUCTION
+LLMs are large neural networks (≥∼7 billion weights and biases) designed to encode complex language patterns
+achieved by training on massive language-based datasets [1]. Their remarkable success in a wide array of natural
+language processing tasks has led to the proliferation of LLM-based tools and applications across various industries
+1https://github.com/kauroy1994/Large-Language-Models-for-Assisting-with-Mental-Health-Diagnostic-Assessments
+Authors’ addresses: Kaushik Roy, kaushikr@email.sc.edu, Artificial Intelligence Institute University of South Carolina, USA; Harshul Surana, harshul19@
+iiserb.ac.in, Indian Institute of Research and Science, Bhopal, India; Darssan Eswaramoorthi, ledarssan@gmail.com, Artificial Intelligence Institute
+University of South Carolina, USA; Yuxin Zi, yzi@email.sc.edu, Artificial Intelligence Institute University of South Carolina, USA; Vedant Palit, ledarssan@
+gmail.com, Indian Institute of Technology, Kharagpur, India; Ritvik Garimella, ritvik916@gmail.com, Artificial Intelligence Institute University of South
+Carolina, USA; Amit Sheth, amit@sc.edu, Artificial Intelligence Institute University of South Carolina, USA.
+1
+arXiv:2501.01305v1  [cs.CL]  2 Jan 2025
+
+2
+Trovato et al.
+[2]. In healthcare, particularly in contexts involving natural language conversations, such as interactions between
+patients and clinicians, LLMs have piqued the interest of stakeholders as a potentially valuable tool to investigate for
+assisting with alleviating some of the burden on clinicians and the overall healthcare system [3]. During patient-clinician
+interactions, clinicians employ standard diagnostic assessment processes for capturing a patient’s state, such as the
+PHQ-9 for depression assessment and the GAD-7 for anxiety assessment [4, 5]. Figure 1 shows the PHQ-9 and GAD-7
+questionnaires. To gainfully leverage LLMs for diagnostic assistance, it is necessary to provide mechanisms for guiding
+Fig. 1. Mental Health Diagnostic Assessment Questionnaires. The Patient Health Questionnaire (PHQ)-9 for depression
+assessment and the Generalized Anxiety Disorder (GAD)-7 for anxiety assessment.
+LLMs in closely following standardized clinical assessment procedures. There are two categories of methods available
+to enable this behavior:
+(i) Prompting LLMs - Modern LLMs stand out for their capacity to tailor responses based on user instructions
+or prompts [6]. However, LLMs are highly sensitive to the specific prompts used [7]. Prompting techniques have
+continuously evolved to enhance the robustness of LLM responses, for example, by using Chain-of-Thought (CoT)
+prompting [8]. Prompting methods are broadly classified under three categories: (i) Naive prompting - Providing direct
+instructions to the LLM in a prompt, (ii) Exemplar-based prompting - Providing direct instructions along with few
+examples of the expected output, and (iii) Guidance-based prompting - Exemplar-based prompting along with providing
+specific guidance on reasoning steps (for example by prompting the LLM to “think” step-by-step).
+(ii) Finetuning LLMs - Fine-tuning of LLMs involves adapting the model’s behavior to closely align with the diagnos-
+tic procedures that clinicians follow, using fine-tuning algorithms such as supervised fine-tuning (SFT), reinforcement
+learning with human feedback (RLHF), and direct preference optimization (DPO) [9]. Fine-tuning LLMs is relatively
+
+Large Language Models for Mental Health Diagnostic Assessments
+3
+more complex than prompting due to the need to curate high-quality data and appropriately formulate task-specific
+prompts or instructions during the fine-tuning process.
+In this work, we explore both approaches using a variety of proprietary and open-source models, namely - the
+Mentalllama and Llama models for finetuning, and the models GPT-3.5 and GPT-4o, llama-3.1-8b and mixtral-8x7b for
+prompting [7, 10–12].
+Related Work and Main Contribution
+Related work leveraging the PHQ-9 and GAD-7 questionnaires for diagnostic assistance for MDD and GAD, can be
+broadly categorized into: Scoring-based methods - Scoring or ranking excerpts from text data (considered representative
+of patient-clinician interactions), based on relevance to symptoms presented in the PHQ-9 and GAD-7 questionnaires
+[13], Explainable AI (xAI)-based methods - that clinically ground BERT-based model outputs against the PHQ-9 and
+GAD-7 symptoms through surrogate modeling such as LIME and SHAP [14], and Text span identification and evidence
+summarization methods - predicting and summarizing text spans over the data, and comparing against human annotated
+samples of highlighted text spans [15]. Our work most closely resembles the Text span identification and evidence
+summarization methods category. However, our work differs in highly specialized steering of model outputs to provide
+information relevant to specific diagnostic criteria in the PHQ-9 and GAD-7 questionnaires across the prompting and
+fine-tuning methods employed in our experimentation. Additionally, we provide two significant contributions (1) a
+first-of-its-kind fine-tuned model specialized for diagnostic criteria assessment based on the llama model architecture,
+which we refer to as the DiagnosticLlama, and (2) A comprehensive set of language model annotated synthetic data,
+evaluated for quality by expert humans for facilitating further research on LLM-powered diagnostic assessment.
+2
+METHODOLOGY
+2.1
+MDD Diagnostic Assistance based on the PHQ-9
+Ground Truth Dataset Creation. We start with the publicly available PRIMATE dataset, which consists of a
+collection of social media posts annotated for PHQ-9 relevant criteria [16]. Appendix A.1 shows an example post and its
+annotation, specifically the post title, the post text, and the annotations indicating whether specific PHQ-9 symptoms are
+present in the post (using yes/no values). We chose this dataset as the authors provide preliminary experimental evidence
+on the effectiveness of using this dataset for guiding language models toward questionnaire-specific determination of
+diagnostic criteria. We first prompt GPT-4o to identify text spans in the posts corresponding to the PHQ-9 symptoms
+by providing an example of the expected output. Appendix A.2 shows an example of a prompt to GPT-4o. It is evident
+from this example how we are attempting to steer the model toward providing PHQ-9-specific diagnostic criteria. We
+then pass the model outputs to expert clinicians who provide us with a subset of GPT-4o annotated outputs that the
+clinicians agree with. This subset is available here2. The clinicians are three anonymized experts from a non-profit
+institution run by a retired professional from the National Institute of Mental Health, Neuroscience, and Allied Fields
+(NIMHANS), India3. The agreement score of 0.74 was recorded among the annotators (measured using Cohen’s Kappa).
+2.1.1
+Prompting-based Methods.
+2https://huggingface.co/datasets/darssanle/GPT-4o-eval
+3https://www.justdial.com/Bangalore/Dr-C-R-Chandrashekar-Samadhana-Counselling-Trust-Centre-Near-Subramanya-Temple-Mico-Layout-Bus-
+Stand-Bannerghatta-Road/080PXX80-XX80-170124231410-U5U4_BZDET
+
+4
+Trovato et al.
+Obtaining Proprietary Model Outputs for MDD Diagnostic Assistance based on the PHQ-9. Maintaining
+exactly the same prompt structure as shown in Appendix A.2, we prompt the models GPT-3.5-Turbo and GPT-4o-mini
+to obtain annotations to a subset of the posts in the PRIMATE dataset. Our subset selection is randomized and limited
+by request costs and our available budget (see Section 4 for funding information).
+For evaluation of the outputs, we employ two methods, (i) hits@k based ranking - We rank-order the text spans
+identified in the model output based on cosine similarity with the symptom, and then check if the identified text span
+occurs within the top k positions in the ground truth output, and (ii) Standard Classification Metrics - We evaluate
+the accuracy, precision, recall and F1-score of the model outputs against the ground truth. Tables 1 and 2 shows the
+evaluation results.
+Table 1. Evaluation of Proprietary LLMs for PHQ-9 Symptom Annotation of PRIMATE Posts Using hits@k.
+Evaluation Metric
+GPT-3.5-Turbo
+GPT-4o-mini
+hits@1
+87%
+89%
+hits@<5
+98%
+99%
+Table 2. Evaluation of Proprietary LLMs for PHQ-9 Symptom Annotation of PRIMATE Posts Using Standard Classification Metrics.
+Method
+Accuracy
+Precision
+Recall
+F1-score
+GPT-3.5-Turbo
+0.93
+0.89
+0.96
+0.92
+GPT-4o-mini
+0.94
+0.96
+0.98
+0.92
+2.1.2
+Obtaining Open-source Model Outputs for MDD Diagnostic Assistance based on the PHQ-9. Similar to
+the proprietary model case, we use the same prompt structure shown in Appendix A.2 and prompt the models llama3.1-
+8b and mixtral-8x7b to obtain annotations. Like the proprietary model(s) case, the subset selection is randomized and
+limited only by rate-limit costs.
+For evaluation, we use the same two methods defined in Section 2.1.1 using the ground truth dataset introduced in
+Section 2 (the hits@k and standard classification metrics). Tables 3 and 4 show the results.
+Table 3. Evaluation of Open-source LLMs for PHQ-9 Symptom Annotation of PRIMATE Posts Using hits@k.
+Evaluation Metric
+llama3.1-8b
+mixtral-8x7b
+hits@1
+83%
+92%
+hits@<5
+88%
+99%
+Table 4. Evaluation of Open-source LLMs for PHQ-9 Symptom Annotation of PRIMATE Posts Using Standard Classification Metrics.
+Method
+Accuracy
+Precision
+Recall
+F1-score
+llama3.1-8b
+0.84
+0.86
+0.78
+0.82
+mixtral-8x7b
+0.92
+0.96
+0.95
+0.93
+
+Large Language Models for Mental Health Diagnostic Assessments
+5
+2.1.3
+Fine-tuning-based Methods.
+The MentalllaMa model. MentalllaMA is a model trained on 105K data samples of mental health instructions on
+social media posts. The samples are collected from 10 existing sources covering eight mental health analysis tasks,
+making MentalllaMA a suitable foundation model for the tasks covered in this study. The instructions used for training
+are a combination of expert-written and few-shot ChatGPT prompt outputs, further validating MentalllaMa as a viable
+candidate for testing adherence to diagnostic criteria by language models [10].
+We perform experiments using MentaLLaMa on the ground truth dataset we introduce in Section 2 and report the
+results. The Prompt is provided in appendix Section B.1.
+The DiagnosticLlama model - Fine-tuning Mentalllama on the PRIMATE dataset using Hugging Face
+AutoTrain. Autorain is a no-code platform designed to simplify the process of training and fine-tuning language
+models on custom data4. The full training specifications for training this model are available in appendix Section C. We
+refer to this model as DiagnosticLlama. Appendix section C.1 shows an example of an input (prompt) and output pair
+obtained using the DiagnosticLlama model. The model space is available here5.
+For evaluation of the outputs, we employ the same two methods as in Section 2.1.1, i.e., (i) hits@k based ranking, and
+(ii) Standard Classification Metrics - the accuracy, precision, recall and F1-score of the model outputs against the ground
+truth. Tables 5 and 6 show the evaluation results.
+Table 5. Evaluation of MentalllaMa and DiagnosticLlama for PHQ-9 Symptom Annotation of PRIMATE Posts Using hits@k.
+Evaluation Metric
+MentalllaMa
+DiagnosticLlama
+hits@1
+-
+68.3%
+hits@<5
+-
+76.2%
+Table 6. Evaluation of MentalllaMa and DiagnosticLlama for PHQ-9 Symptom Annotation of PRIMATE Posts Using Standard
+Classification Metrics.
+Method
+Accuracy
+Precision
+Recall
+F1-score
+MentalllaMa
+0.82
+0.83
+0.63
+0.75
+DiagnosticLlama
+-
+-
+-
+-
+2.2
+GAD Diagnostic Assistance based on the GAD-7
+Ground Truth Dataset Creation. Once again, we start with the publicly available PRIMATE dataset. We then
+prompt GPT-4o to identify text spans in the posts corresponding to the GAD-7 symptoms by providing an example of
+the expected output. Appendix A.2 shows an example of a prompt to GPT-4o. This example clarifies how we attempt to
+steer the model toward providing GAD-7-specific diagnostic criteria. Similar to the PHQ-9 case, we then pass the model
+outputs to expert clinicians who provide us with a subset of GPT-4o annotated outputs that the clinicians agree with.
+This subset is available here6. The clinicians are the same three anonymized experts from the non-profit mentioned in
+Section 2.1. The agreement score of 0.72 was recorded among the annotators (measured using Cohen’s Kappa).
+4https://huggingface.co/docs/autotrain/index
+5https://huggingface.co/barca-boy/primate_autotrain_mental_llama
+6https://huggingface.co/datasets/darssanle/GPT-4o-GAD-7
+
+6
+Trovato et al.
+2.2.1
+Prompting-based Methods.
+Obtaining Proprietary Model Outputs for MDD Diagnostic Assistance based on the GAD-7. Maintaining
+exactly the same prompt structure as shown in Appendix A.2, we prompt the models GPT-3.5-Turbo and GPT-4o-mini
+to obtain annotations to a subset of the posts in the PRIMATE dataset, but this time geared towards responses to the
+GAD-7 symptoms. Our subset selection is randomized and limited by request costs and our available budget (see Section
+4 for funding information).
+For evaluation of the outputs, we employ the same two methods as in the PHQ-9 case, i.e., (i) hits@k based ranking,
+and (ii) Standard Classification Metrics - the accuracy, precision, recall and F1-score of the model outputs against the
+ground truth. Tables 7 and 8 show the evaluation results.
+Table 7. Evaluation of Proprietary LLMs for GAD-7 Symptom Annotation of PRIMATE Posts Using hits@k.
+Evaluation Metric
+GPT-3.5-Turbo
+GPT-4o-mini
+hits@1
+88%
+89%
+hits@<5
+98%
+98%
+Table 8. Evaluation of Proprietary LLMs for GAD-7 Symptom Annotation of PRIMATE Posts Using Standard Classification Metrics.
+Method
+Accuracy
+Precision
+Recall
+F1-score
+GPT-3.5-Turbo
+0.95
+0.9
+0.95
+0.91
+GPT-4o-mini
+0.93
+0.97
+0.91
+0.92
+2.2.2
+Obtaining Open-source Model Outputs for MDD Diagnostic Assistance based on the GAD-7. Like the
+PHQ-9, we use the same prompt structure shown in Appendix A.2 and prompt the models llama3.1-8b and mixtral-8x7b
+to obtain annotations to the GAD-7 symptoms. As before, the subset selection is randomized and limited only by
+rate-limit costs.
+For evaluation, we use the same two methods defined in Section 2.1.1 using the ground truth dataset introduced in
+Section 2 (the hits@k and standard classification metrics). Tables 9 and 10 show the results.
+Table 9. Evaluation of Open-source LLMs for GAD-7 Symptom Annotation of PRIMATE Posts Using hits@k.
+Evaluation Metric
+llama3.1-8b
+mixtral-8x7b
+hits@1
+83%
+92%
+hits@<5
+88%
+99%
+2.3
+A Note on older LLMs and Classification-based Approaches
+Older Autoregressive LLMs. The previous sections have covered the best-performing LLMs. However, we have
+performed experiments on older LLMs such as Llama2 and Mistral, and we provide these results in Table 11 [11, 17].
+
+Large Language Models for Mental Health Diagnostic Assessments
+7
+Table 10. Evaluation of Open-source LLMs for GAD-7 Symptom Annotation of PRIMATE Posts Using Standard Classification Metrics.
+Method
+Accuracy
+Precision
+Recall
+F1-score
+llama3.1-8b
+0.84
+0.86
+0.78
+0.82
+mixtral-8x7b
+0.92
+0.96
+0.95
+0.93
+Table 11. Evaluation of Llama2-7b-chat and Mistral-Instruct for PHQ-9 Symptom Annotations of the PRIMATE Posts Using F1 scores.
+Method
+F1-score
+llama2-7b-chat
+0.663
+mistral-instruct
+0.655
+Older pretrained language models. Several classification-based approaches have been used to classify posts into labels
+corresponding to diagnostic criteria on questionnaires as an alternative to generative models [16, 18]. Although this
+work focuses on modern LLMs, we also perform experiments in the classification setting using the older pretrained
+models - BERT, MentalBERT, and MentalRoBERTa [19, 20]. Table 12 shows the results7.
+Table 12. Evaluation of BERT, MentalBERT, and MentalRoBERTa for PHQ-9 Symptom Annotations of the PRIMATE Posts Using F1
+scores.
+Method
+F1-score
+BERT
+0.69
+MentalBERT
+0.71
+MentalRoBERTa
+0.48
+2.4
+Model and Data Artifact Details
+As part of this study, we release several software artifacts, including one model - the DiagnosticLlama model (available
+here8), and multiple annotated datasets that contain diagnostic symptom predictions along with text-span highlights
+categorized into:
+(a) PHQ-9-based Annotations, namely - (i) GPT-3.5-PHQ-9 annotations (ii) GPT-4o_mini-PHQ-9 annotations, (iii)
+GPT-4o-PHQ-9 annotations, (iv) llama3.1_8b-PHQ-9 annotations, (v) mixtral-8x7b-PHQ-9 annotations, and
+(b) containing GAD-7 based annotations (i) GPT-3.5-GAD-7 annotations (ii) GPT-4o_mini-GAD-7 annotations,
+(iii) GPT-4o-GAD-7 annotations, (iv) llama3.1_8b-GAD-7 annotations, (v) mixtral-8x7b-GAD-7 annotations.
+The datasets are all available at this link9. The dataset statistics are available as part of the dataset cards in the links
+provided. The dataset cards also show the details of the prompting structure used to generate the LLM outputs. We have
+also consolidated all the links to the model and data artifacts in this Github repository10. Table 13 provides a summary.
+7For completeness, we also show results of traditional machine learning-based classification methods in appendix Section D
+8https://huggingface.co/barca-boy/primate_autotrain_mental_llama
+9https://huggingface.co/collections/darssanle/mhd-datasets-669628ee2d25bd04e99dc3bf
+10https://github.com/kauroy1994/Large-Language-Models-for-Assisting-with-Mental-Health-Diagnostic-Assessments
+
+8
+Trovato et al.
+Table 13. Dataset Statistics (number of posts) for All the Datasets in Section 2.4
+Dataset
+Number of Posts
+GPT-3.5-PHQ-9
+339
+GPT-4o_mini-PHQ-9
+102
+GPT-4o-PHQ-9
+40
+llama3.1_8b-PHQ-9
+155
+mixtral-8x7b-PHQ-9
+97
+GPT-4o_mini-GAD-7
+51
+GPT-4o-GAD-7
+17
+llama3.1_8b-GAD-7
+124
+mixtral-8x7b-GAD-7
+109
+Total
+1034
+3
+RESULTS
+3.1
+PHQ-9 Results
+From Tables 1, 2, 3, and 4, we see that both the proprietary and open-source LLMs approach human annotation quality,
+and Tables 5 and 6 show that fine-tuning LLMs for diagnostic assistance shows promising results. However, fine-tuning
+LLMs has turned out to be highly challenging and needs considerable resources and hyperparameter tuning to get right.
+The entries for MentalllaMa are blank in the tables because the MentalllaMa model reiterates the input verbatim, as
+seen in Section B.1. This further shows the difficulty of adequately leveraging fine-tuned models to achieve good results
+in highly specialized tasks such as diagnostic assistance. Still, the preliminary results on the PHQ-9 task demonstrate
+that this can be done with a good bit of trial and error on the fine-tuning configurations. It is essential to be able to
+deploy specialized models fine-tuned/trained on custom data in safety-constrained and privacy-critical settings.
+Interestingly, Table 11 shows significant performance gaps between the older and newer LLMs (open-source and
+proprietary models). We also find from Table 12 that older pretrained language models (that are not autoregressive),
+perform as well as older LLMs. We also see again that fine-tuning in the case of pretrained LLMs does not lead to
+much change in performance and sometimes leads to bad performance (e.g., MentalRoBERTa), further evidencing the
+significant challenge with fine-tuning language models for specialized tasks such as mental health diagnostic assistance.
+3.2
+GAD-7 Results
+For the GAD-7 results, from Tables 5, 6, 9, and 10 we see a similar trend as the PHQ-9 case, i.e., both proprietary and
+open-source LLMs approach human annotations quality.
+Among the proprietary models, we find GPT-4o_mini to be the best performing, and mixtral-8x7b-GAD-7 among
+the open-source models. However, there are no significant differences between the different LLMs, including both
+proprietary and open-source LLMs.
+4
+CONCLUSION AND FUTURE WORK
+Previous efforts in utilizing Large Language Models (LLMs) for mental health assistance have primarily focused on
+conversational data or diagnostic assessment as a classification problem. However, these initiatives lack the precision
+and guidance necessary for effective assessment with robust explanations (reasoning), and response generation, based
+on established questionnaires. This gap is significant because standardized assessment tools, such as the PHQ-9 for
+
+Large Language Models for Mental Health Diagnostic Assessments
+9
+major depressive disorder and the GAD-7 for general anxiety disorder, are indispensable for accurate and effective
+treatment planning in mental healthcare. Our research addresses this gap by specifically targeting these assessment
+procedures and developing prompting strategies to guide LLMs toward crafting clinician-friendly responses with
+explanations using assessment and reasoning prompts.
+Our findings reveal that while LLMs struggle to effectively utilize questionnaire information in prompts to provide
+assessments resembling those of clinicians in the zero-shot setting, their performance significantly improves in the
+few-shot setting (both in fine-tuning and few-shot prompting regime), nearly matching the assessments of expert
+clinicians. However, despite this improvement, LLMs still do not reason in the same manner as clinicians when arriving
+at assessments, matching clinician reasoning only a fraction of the time, as evidenced by the sizes of the ground truth
+datasets for which a high expert agreement score is obtained. This underscores the need for further scrutiny in the
+integration of LLMs, along with prompting methods incorporating diagnostic assessment criteria, before they can be
+reliably utilized in mental healthcare assistance. Moreover, our work introduces several novel assessment LLM and
+instruction-tuning datasets, offering a valuable resource for future research aimed at understanding and enhancing the
+effectiveness of LLMs in assisting with assessments within mental healthcare settings. This contribution holds promise
+for advancing the capabilities of LLMs in mental health support, potentially alleviating the strain on healthcare systems
+caused by a shortage of care providers and an increasing number of patients.
+Future Work. We are working on integrating the models studied in this work into a clinician-facing app, and
+extending the DiagnosticLlama model to include GAD-7, and expanding all datasets in Section 2.4 to match the
+original PRIMATE dataset. We are also expanding our datasets and results to include more GAD-7-based results and
+non-linearly structured questionnaires (example flowcharts) such as the CSSRS [21]11. Finally, we are also working to
+incorporate additional constraints, such as restricted terminology (e.g., non-toxic terminology), by paraphrasing the
+LLM outputs [22, 23]. All future updates will be released on the GitHub repository.
+ACKNOWLEDGEMENTS
+This research is partially supported by NSF Award 2335967 EAGER: Knowledge-guided neurosymbolic AI with guardrails
+for safe virtual health assistants12 [24–29]. The views expressed here are those of the authors, not those of the sponsors.
+REFERENCES
+[1] Arun James Thirunavukarasu, Darren Shu Jeng Ting, Kabilan Elangovan, Laura Gutierrez, Ting Fang Tan, and Daniel Shu Wei Ting. Large language
+models in medicine. Nature medicine, 29(8):1930–1940, 2023.
+[2] Nitin Rane. Chatgpt and similar generative artificial intelligence (ai) for building and construction industry: Contribution, opportunities and
+challenges of large language models for industry 4.0, industry 5.0, and society 5.0. Opportunities and Challenges of Large Language Models for
+Industry, 4, 2023.
+[3] Peter Lee, Sebastien Bubeck, and Joseph Petro. Benefits, limits, and risks of gpt-4 as an ai chatbot for medicine. New England Journal of Medicine,
+388(13):1233–1239, 2023.
+[4] Joseph Ford, Felicity Thomas, Richard Byng, and Rose McCabe. Use of the patient health questionnaire (phq-9) in practice: Interactions between
+patients and physicians. Qualitative Health Research, 30(13):2146–2159, 2020.
+[5] Sverre Urnes Johnson, Pål Gunnar Ulvenes, Tuva Øktedalen, and Asle Hoffart. Psychometric properties of the general anxiety disorder 7-item
+(gad-7) scale in a heterogeneous psychiatric sample. Frontiers in psychology, 10:1713, 2019.
+[6] Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Carroll Wainwright, Pamela Mishkin, Chong Zhang, Sandhini Agarwal, Katarina Slama, Alex
+Ray, et al. Training language models to follow instructions with human feedback. Advances in Neural Information Processing Systems, 35:27730–27744,
+2022.
+11app demo link: https://www.youtube.com/watch?v=VpJYyb7brRs&list=PLqJzTtkUiq577Rc1HpX4iE1_ntNeuppzA&index=22
+12https://www.nsf.gov/awardsearch/showAward?AWD_ID=2335967
+
+10
+Trovato et al.
+[7] Tom Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared D Kaplan, Prafulla Dhariwal, Arvind Neelakantan, Pranav Shyam, Girish Sastry,
+Amanda Askell, et al. Language models are few-shot learners. Advances in neural information processing systems, 33:1877–1901, 2020.
+[8] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Fei Xia, Ed Chi, Quoc V Le, Denny Zhou, et al. Chain-of-thought prompting elicits
+reasoning in large language models. Advances in Neural Information Processing Systems, 35:24824–24837, 2022.
+[9] Rafael Rafailov, Archit Sharma, Eric Mitchell, Christopher D Manning, Stefano Ermon, and Chelsea Finn. Direct preference optimization: Your
+language model is secretly a reward model. Advances in Neural Information Processing Systems, 36, 2024.
+[10] Kailai Yang, Tianlin Zhang, Ziyan Kuang, Qianqian Xie, Jimin Huang, and Sophia Ananiadou. Mentallama: interpretable mental health analysis on
+social media with large language models. In Proceedings of the ACM on Web Conference 2024, pages 4489–4500, 2024.
+[11] Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric
+Hambro, Faisal Azhar, et al. Llama: Open and efficient foundation language models. arXiv preprint arXiv:2302.13971, 2023.
+[12] Albert Q Jiang, Alexandre Sablayrolles, Antoine Roux, Arthur Mensch, Blanche Savary, Chris Bamford, Devendra Singh Chaplot, Diego de las Casas,
+Emma Bou Hanna, Florian Bressand, et al. Mixtral of experts. arXiv preprint arXiv:2401.04088, 2024.
+[13] Anxo Pérez, Marcos Fernández-Pichel, Javier Parapar, and David E Losada. Depresym: A depression symptom annotated corpus and the role of llms
+as assessors of psychological markers. arXiv preprint arXiv:2308.10758, 2023.
+[14] Ayah Zirikly and Mark Dredze. Explaining models of mental health via clinically grounded auxiliary tasks. In Proceedings of the Eighth Workshop on
+Computational Linguistics and Clinical Psychology, pages 30–39, 2022.
+[15] Andrew Yates, Bart Desmet, Emily Prud’Hommeaux, Ayah Zirikly, Steven Bedrick, Sean MacAvaney, Kfir Bar, Molly Ireland, and Yaakov Ophir.
+Proceedings of the 9th workshop on computational linguistics and clinical psychology (clpsych 2024). In Proceedings of the 9th Workshop on
+Computational Linguistics and Clinical Psychology (CLPsych 2024), 2024.
+[16] Shrey Gupta, Anmol Agarwal, Manas Gaur, Kaushik Roy, Vignesh Narayanan, Ponnurangam Kumaraguru, and Amit Sheth. Learning to automate
+follow-up question generation using process knowledge for depression triage on reddit posts. In Proceedings of the Eighth Workshop on Computational
+Linguistics and Clinical Psychology, pages 137–147, 2022.
+[17] Albert Q Jiang, Alexandre Sablayrolles, Arthur Mensch, Chris Bamford, Devendra Singh Chaplot, Diego de las Casas, Florian Bressand, Gianna
+Lengyel, Guillaume Lample, Lucile Saulnier, et al. Mistral 7b. arXiv preprint arXiv:2310.06825, 2023.
+[18] Sumit Dalal, Deepa Tilwani, Manas Gaur, Sarika Jain, Valerie Shalin, and Amit Seth. A cross attention approach to diagnostic explainability using
+clinical practice guidelines for depression. arXiv preprint arXiv:2311.13852, 2023.
+[19] Jacob Devlin. Bert: Pre-training of deep bidirectional transformers for language understanding. arXiv preprint arXiv:1810.04805, 2018.
+[20] Shaoxiong Ji, Tianlin Zhang, Luna Ansari, Jie Fu, Prayag Tiwari, and Erik Cambria. Mentalbert: Publicly available pretrained language models for
+mental healthcare. In Proceedings of the Thirteenth Language Resources and Evaluation Conference, pages 7184–7190, 2022.
+[21] Kaushik Roy, Yuxin Zi, Manas Gaur, Jinendra Malekar, Qi Zhang, Vignesh Narayanan, and Amit Sheth. Process knowledge-infused learning for
+clinician-friendly explanations. In Proceedings of the AAAI Symposium Series, volume 1, pages 154–160, 2023.
+[22] Adam Tsakalidis, Jenny Chim, Iman Munire Bilal, Ayah Zirikly, Dana Atzil-Slonim, Federico Nanni, Philip Resnik, Manas Gaur, Kaushik Roy, Becky
+Inkster, et al. Overview of the clpsych 2022 shared task: Capturing moments of change in longitudinal user posts. In Proceedings of the Eighth
+Workshop on Computational Linguistics and Clinical Psychology, pages 184–198, 2022.
+[23] Kaushik Roy, Manas Gaur, Misagh Soltani, Vipula Rawte, Ashwin Kalyan, and Amit Sheth. Proknow: Process knowledge for safety constrained and
+explainable question generation for mental health diagnostic assistance. Frontiers in big Data, 5:1056728, 2023.
+[24] Amit Sheth, Manas Gaur, Kaushik Roy, and Keyur Faldu. Knowledge-intensive language understanding for explainable ai. IEEE Internet Computing,
+25(5):19–24, 2021.
+[25] Amit Sheth, Manas Gaur, Kaushik Roy, Revathy Venkataraman, and Vedant Khandelwal. Process knowledge-infused ai: Toward user-level
+explainability, interpretability, and safety. IEEE Internet Computing, 26(5):76–84, 2022.
+[26] Amit Sheth, Kaushik Roy, and Manas Gaur. Neurosymbolic artificial intelligence (why, what, and how). IEEE Intelligent Systems, 38(3):56–62, 2023.
+[27] Amit Sheth and Kaushik Roy. Neurosymbolic value-inspired artificial intelligence (why, what, and how). IEEE Intelligent Systems, 39(1):5–11, 2024.
+[28] Amit Sheth, Kaushik Roy, Hemant Purohit, and Amitava Das. Civilizing and humanizing artificial intelligence in the age of large language models.
+IEEE Internet Computing, 28(5):5–10, 2024.
+[29] Amit Sheth, Vishal Pallagani, and Kaushik Roy. Neurosymbolic ai for enhancing instructability in generative ai. IEEE Intelligent Systems, 39(5):5–11,
+2024.
+APPENDIX
+A
+DATASET EXAMPLES
+A.1
+Primate Data Example
+1
+{
+2
+" p o s t _ t i t l e " :
+" I ␣don ' t ␣f e e l ␣o r i g i n a l ␣anymore . " ,
+
+Large Language Models for Mental Health Diagnostic Assessments
+11
+3
+" p o s t _ t e x t " :
+"When ␣I ␣was ␣in ␣high ␣school ␣a ␣few ␣years ␣back , ␣I ␣was ␣one ␣of ␣the ␣
+h i ghest ␣competitors ␣in ␣my␣school . ␣I ␣j o i n e d ␣the ␣high ␣school ␣band ␣in ␣
+freshman ␣year ␣and ␣by ␣s e n i o r ␣year ␣I ␣became ␣one ␣of ␣the ␣b e s t ␣in ␣my␣s e c t i o n
+. ␣My␣academics ␣were ␣always ␣s t r a i g h t ␣and ␣I ␣e x e r c i s e d ␣d a i l y . ␣Senior ␣year ␣
+I ␣e n l i s t e d ␣in ␣the ␣m i l i t a r y ␣and ␣now ␣I ␣b e l i e v e ␣i t ␣was ␣one ␣of ␣my␣worst ␣
+d e c i s i o n s ␣in ␣l i f e . ␣Before ␣I ␣went ␣to ␣boot ␣camp ␣I ␣was ␣motivated , ␣a ␣
+p a t r i o t ␣and ␣b e l i e v e d ␣t h a t ␣the ␣e l i t e ␣j o i n e d ␣the ␣m i l i t a r y . ␣In ␣s e n i o r ␣year
+␣I ␣never ␣a p p l i e d ␣f o r ␣any ␣s c h o l a r s h i p s ␣and ␣I ␣was ␣o f f e r e d ␣one ␣but ␣turned ␣
+i t ␣down ␣because ␣I ␣already ␣signed ␣the ␣papers . ␣I ␣thought ␣I ␣s e t ␣myself ␣up ␣
+f o r ␣success . ␣Now␣I ␣b e l i e v e ␣I ␣was ␣dead ␣wrong ␣f o r ␣j o i n i n g . ␣The ␣only ␣
+b e n e f i t ␣I ␣see ␣so ␣f a r ␣a f t e r ␣a ␣year ␣and ␣a ␣h a l f ␣of ␣s e r v i c e ␣i s ␣t h a t ␣I 'm␣
+t r y i n g ␣to ␣s e t ␣myself ␣up ␣f i n a n c i a l l y ␣before ␣I ␣get ␣out ␣and ␣h o p e f u l l y ␣
+attend ␣c o l l e g e . ␣I t ␣sounds ␣l i k e ␣a ␣plan ␣but ␣I ␣f e e l ␣no ␣happiness ␣from ␣what
+␣I ␣do ␣at ␣a l l . ␣I ␣convinced ␣myself ␣there ' s ␣no ␣honor ␣in ␣i t ␣anymore , ␣i t ' s ␣
+j u s t ␣another ␣job . ␣I ␣don ' t ␣e x e r c i s e ␣by ␣myself ␣anymore . ␣I ␣f e e l ␣l i k e ␣I 'm␣
+not ␣progressing ␣anywhere ␣in ␣l i f e ␣being ␣in ␣s e r v i c e . ␣I 'm␣j u s t ␣a ␣body ␣and ␣
+i f ␣I ␣wasn ' t ␣here ␣doing ␣what ␣I 'm␣doing , ␣there ' d ␣j u s t ␣be ␣somebody ␣e l s e ␣
+doing ␣the ␣exact ␣same . ␣I 'm␣r e p l a c e a b l e . ␣That ' s ␣the ␣mindset ␣the ␣m i l i t a r y ␣
+gave ␣me . ␣I ␣look ␣forward ␣to ␣going ␣back ␣home ␣in ␣6 ␣months ␣f o r ␣vacation ␣and
+␣t h a t ' s ␣the ␣only ␣thing ␣I ' ve ␣been ␣looking ␣forward ␣to ␣s i n c e ␣I ' ve ␣been ␣
+s t a t i o n e d . ␣After ␣that , ␣the ␣only ␣thing ␣I ␣have ␣my␣eyes ␣on ␣are ␣g e t t i n g ␣out
+␣of ␣service , ␣going ␣home , ␣being ␣c l o s e r ␣to ␣my␣family ␣again . ␣There ' s ␣
+nothing ␣here ␣t h a t ␣s a t i s f i e s ␣me ␣and ␣I ␣hate ␣i t . ␣I ␣f e e l ␣l i k e ␣I ' ve ␣t r i e d ␣
+everything ␣to ␣be ␣happy ␣here ␣but ␣i t ␣seems ␣i m p o s s i b l e . ␣I ␣wish ␣somebody ␣
+could ␣help . " ,
+4
+" annotations " :
+[
+5
+[
+6
+" Feeling −bad −about −yourself −or −that −you−are −a−f a i l u r e −or −have −l e t −
+yourself −or −your −family −down " ,
+7
+" yes "
+8
+] ,
+9
+[
+10
+" Feeling −down−depressed −or −hopeless " ,
+11
+" no "
+12
+] ,
+13
+[
+14
+" Feeling −t i r e d −or −having −l i t t l e −energy " ,
+15
+" yes "
+
+12
+Trovato et al.
+16
+] ,
+17
+[
+18
+" L i t t l e −i n t e r e s t −or −pleasure −in −doing " ,
+19
+" yes "
+20
+] ,
+21
+[
+22
+" Moving−or −speaking −so −slowly −that −other −people −could −have −noticed −Or−
+the −opposite −being −so −fidgety −or −r e s t l e s s −that −you−have −been −moving
+−around −a−lot −more−than −usual " ,
+23
+" no "
+24
+] ,
+25
+[
+26
+" Poor −a p pe t i t e −or −o ve r e at i n g " ,
+27
+" no "
+28
+] ,
+29
+[
+30
+" Thoughts −that −you−would −be −b e t t e r −off −dead −or −of −hurting −yourself −in −
+some−way " ,
+31
+" no "
+32
+] ,
+33
+[
+34
+" Trouble −concentrating −on−things −such −as −reading −the −newspaper −or −
+watching −t e l e v i s i o n " ,
+35
+" no "
+36
+] ,
+37
+[
+38
+" Trouble −f a l l i n g −or −staying −asleep −or −sleeping −too −much " ,
+39
+" no "
+40
+]
+41
+]
+42
+}
+A.2
+GPT-4o Prompt Example
+1
+" " "
+When given
+the
+below JSON f o r m a t t e d
+f i l e
+content ,
+I
+need
+you
+to
+g i v e me the
+s p e c i f i c
+s e n t e n c e s
+from
+the
+t e x t
+t h a t
+e x h i b i t
+a
+s e t
+of
+symptoms .
+Below
+i s
+an example
+of
+INPUT and OUTPUT .
+Keep JSON Formatting
+f o r
+output :
+2
+
+Large Language Models for Mental Health Diagnostic Assessments
+13
+3
+{
+4
+" p o s t _ t i t l e " :
+" I
+don ' t
+f e e l
+o r i g i n a l
+anymore . " ,
+5
+" p o s t _ t e x t " :
+"When I
+was
+in
+high
+s c h o o l
+a few
+y e a r s
+back ,
+I
+was one
+of
+the
+h i g h e s t
+c o m p e t i t o r s
+in my s c h o o l .
+I
+j o i n e d
+the
+high
+s c h o o l
+band
+in
+freshman
+year
+and by
+s e n i o r
+year
+I
+became
+one
+of
+the
+b e s t
+in my s e c t i o n
+. My academics
+were
+always
+s t r a i g h t
+and
+I
+e x e r c i s e d
+d a i l y .
+S e n i o r
+year
+I
+e n l i s t e d
+in
+the
+m i l i t a r y
+and now I
+b e l i e v e
+i t
+was one
+of my worst
+d e c i s i o n s
+in
+l i f e .
+B e f o r e
+I
+went
+to
+boot camp
+I
+was motivated ,
+a
+p a t r i o t
+and
+b e l i e v e d
+t h a t
+the
+e l i t e
+j o i n e d
+the
+m i l i t a r y .
+In
+s e n i o r
+year
+I
+never
+a p p l i e d
+f o r
+any
+s c h o l a r s h i p s
+and
+I
+was
+o f f e r e d
+one
+but
+turned
+i t
+down because
+I
+a l r e a d y
+s i g n e d
+the
+papers .
+I
+thought
+I
+s e t
+myself
+up
+f o r
+s u c c e s s . Now I
+b e l i e v e
+I
+was dead wrong
+f o r
+j o i n i n g .
+The
+only
+b e n e f i t
+I
+s e e
+so
+f a r
+a f t e r
+a year
+and a
+h a l f
+of
+s e r v i c e
+i s
+t h a t
+I 'm
+t r y i n g
+to
+s e t
+myself
+up
+f i n a n c i a l l y
+b e f o r e
+I
+g e t
+out
+and
+h o p e f u l l y
+a t t e n d
+c o l l e g e .
+I t
+sounds
+l i k e
+a plan
+but
+I
+f e e l
+no
+h a p p i n e s s
+from what
+I
+do
+at
+a l l .
+I
+con vinced
+myself
+t h e r e ' s
+no honor
+in
+i t
+anymore ,
+i t ' s
+j u s t
+another
+j o b .
+I
+don ' t
+e x e r c i s e
+by
+myself
+anymore .
+I
+f e e l
+l i k e
+I 'm
+not
+p r o g r e s s i n g
+anywhere
+in
+l i f e
+being
+in
+s e r v i c e .
+I 'm j u s t
+a body and
+i f
+I
+wasn ' t
+here
+doing
+what
+I 'm doing ,
+t h e r e ' d
+j u s t
+be
+somebody
+e l s e
+doing
+the
+e x a c t
+same .
+I 'm r e p l a c e a b l e .
+That ' s
+the
+mindset
+the
+m i l i t a r y
+gave me .
+I
+l o ok
+forward
+to
+going
+back home in
+6 months
+f o r
+v a c a t i o n
+and
+t h a t ' s
+the
+only
+t hi ng
+I ' ve
+been
+l o o k i n g
+forward
+to
+s i n c e
+I ' ve
+been
+s t a t i o n e d .
+A f t e r
+that ,
+the
+only
+t h i n g
+I
+have my eyes
+on
+are
+g e t t i n g
+out
+of
+s e r v i c e ,
+going home ,
+being
+c l o s e r
+to my family
+again .
+There ' s
+nothing
+here
+t h a t
+s a t i s f i e s
+me and
+I
+hate
+i t .
+I
+f e e l
+l i k e
+I ' ve
+t r i e d
+e v e r y t h i n g
+to
+be happy
+here
+but
+i t
+seems
+i m p o s s i b l e .
+I
+wish
+somebody
+could
+help . " ,
+6
+" a n n o t a t i o n s " :
+[
+7
+[
+8
+" F e e l i n g −bad −about −y o u r s e l f −or −that −you −are −a−f a i l u r e −or −have −l e t −
+y o u r s e l f −or −your −family −down " ,
+9
+" yes "
+10
+] ,
+11
+[
+12
+" F e e l i n g −down−d e p r e s s e d −or −h o p e l e s s " ,
+13
+" no "
+14
+] ,
+15
+[
+
+14
+Trovato et al.
+16
+" F e e l i n g −t i r e d −or −having −l i t t l e −energy " ,
+17
+" yes "
+18
+] ,
+19
+[
+20
+" L i t t l e −i n t e r e s t −or −p l e a s u r e −in −doing " ,
+21
+" yes "
+22
+] ,
+23
+[
+24
+" Moving −or −speaking −so −slowly −that −other −people −could −have −n o t i c e d −Or−
+the −o p p o s i t e −being −so −f i d g e t y −or −r e s t l e s s −that −you −have −been −moving
+−around −a−l o t −more −than −usual " ,
+25
+" no "
+26
+] ,
+27
+[
+28
+" Poor −a p p e t i t e −or −o v e r e a t i n g " ,
+29
+" no "
+30
+] ,
+31
+[
+32
+" Thoughts −that −you −would −be −b e t t e r −off −dead −or −of −hurting −y o u r s e l f −in −
+some −way " ,
+33
+" no "
+34
+] ,
+35
+[
+36
+" Trouble −c o n c e n t r a t i n g −on −things −such −as −reading −the −newspaper −or −
+watching −t e l e v i s i o n " ,
+37
+" no "
+38
+] ,
+39
+[
+40
+" Trouble −f a l l i n g −or −staying −a s l e e p −or −s l e e p i n g −too −much " ,
+41
+" no "
+42
+]
+43
+]
+44
+}
+45
+46
+And
+t h i s
+i s
+an example
+e x p e c t e d
+output
+format :
+47
+48
+{
+49
+" p o s t _ t i t l e " :
+" I
+don ' t
+f e e l
+o r i g i n a l
+anymore . " ,
+
+Large Language Models for Mental Health Diagnostic Assessments
+15
+50
+" p o s t _ t e x t " :
+"When I
+was
+in
+high
+s c h o o l
+a few
+y e a r s
+back ,
+I
+was one
+of
+the
+h i g h e s t
+c o m p e t i t o r s
+in my s c h o o l .
+I
+j o i n e d
+the
+high
+s c h o o l
+band
+in
+freshman
+year
+and by
+s e n i o r
+year
+I
+became
+one
+of
+the
+b e s t
+in my s e c t i o n
+. My academics
+were
+always
+s t r a i g h t ,
+and
+I
+e x e r c i s e d
+d a i l y .
+S e n i o r
+year
+I
+e n l i s t e d
+in
+the
+m i l i t a r y ,
+and now I
+b e l i e v e
+i t
+was one
+of my worst
+d e c i s i o n s
+in
+l i f e .
+B e f o r e
+I
+went
+to
+boot camp
+I
+was motivated ,
+a
+p a t r i o t
+and
+b e l i e v e d
+t h a t
+the
+e l i t e
+j o i n e d
+the
+m i l i t a r y .
+In
+s e n i o r
+year
+I
+never
+a p p l i e d
+f o r
+any
+s c h o l a r s h i p s
+and
+I
+was
+o f f e r e d
+one
+but
+turned
+i t
+down because
+I
+a l r e a d y
+s i g n e d
+the
+papers .
+I
+thought
+I
+s e t
+myself
+up
+f o r
+s u c c e s s . Now I
+b e l i e v e
+I
+was dead wrong
+f o r
+j o i n i n g .
+The
+only
+b e n e f i t
+I
+s e e
+so
+f a r
+a f t e r
+a year
+and a
+h a l f
+of
+s e r v i c e
+i s
+t h a t
+I 'm
+t r y i n g
+to
+s e t
+myself
+up
+f i n a n c i a l l y
+b e f o r e
+I
+g e t
+out
+and
+h o p e f u l l y
+a t t e n d
+c o l l e g e .
+I t
+sounds
+l i k e
+a plan
+but
+I
+f e e l
+no
+h a p p i n e s s
+from what
+I
+do
+at
+a l l .
+I
+con vinced
+myself
+t h e r e ' s
+no honor
+in
+i t
+anymore ;
+i t ' s
+j u s t
+another
+j o b .
+I
+don ' t
+e x e r c i s e
+by
+myself
+anymore .
+I
+f e e l
+l i k e
+I 'm
+not
+p r o g r e s s i n g
+anywhere
+in
+l i f e
+being
+in
+s e r v i c e .
+I 'm j u s t
+a body ,
+and
+i f
+I
+wasn ' t
+here
+doing
+what
+I 'm doing ,
+t h e r e ' d
+j u s t
+be
+somebody
+e l s e
+doing
+the
+e x a c t
+same .
+I 'm r e p l a c e a b l e .
+That ' s
+the
+mindset
+the
+m i l i t a r y
+gave me .
+I
+l o ok
+forward
+to
+going
+back home in
+6 months
+f o r
+vacation ,
+and
+t h a t ' s
+the
+only
+t hi ng
+I ' ve
+been
+l o o k i n g
+forward
+to
+s i n c e
+I ' ve
+been
+s t a t i o n e d .
+A f t e r
+that ,
+the
+only
+t h i n g
+I
+have my eyes
+on
+i s
+g e t t i n g
+out
+of
+s e r v i c e ,
+going home ,
+being
+c l o s e r
+to my family
+again .
+There ' s
+nothing
+here
+t h a t
+s a t i s f i e s
+me ,
+and
+I
+hate
+i t .
+I
+f e e l
+l i k e
+I ' ve
+t r i e d
+e v e r y t h i n g
+to
+be happy
+here
+but
+i t
+seems
+i m p o s s i b l e .
+I
+wish
+somebody
+could
+help . " ,
+51
+" a n n o t a t i o n s " :
+{
+52
+" F e e l i n g −bad −about −y o u r s e l f −or −that −you −are −a−f a i l u r e −or −have −l e t −
+y o u r s e l f −or −your −family −down " :
+[
+53
+" I
+thought
+I
+s e t
+myself
+up
+f o r
+s u c c e s s . Now I
+b e l i e v e
+I
+was dead wrong
+f o r
+j o i n i n g . "
+54
+] ,
+55
+" F e e l i n g −down−d e p r e s s e d −or −h o p e l e s s " :
+[ ] ,
+56
+" F e e l i n g −t i r e d −or −having −l i t t l e −energy " :
+[
+57
+" I
+f e e l
+l i k e
+I 'm not
+p r o g r e s s i n g
+anywhere
+in
+l i f e
+being
+in
+s e r v i c e . "
+58
+] ,
+59
+" L i t t l e −i n t e r e s t −or −p l e a s u r e −in −doing " :
+[
+60
+" There ' s
+nothing
+here
+t h a t
+s a t i s f i e s
+me ,
+and
+I
+hate
+i t . "
+61
+] ,
+
+16
+Trovato et al.
+62
+" Moving −or −speaking −so −slowly −that −other −people −could −have −n o t i c e d −Or−the
+−o p p o s i t e −being −so −f i d g e t y −or −r e s t l e s s −that −you −have −been −moving −
+around −a−l o t −more −than −usual " :
+[ ] ,
+63
+" Poor −a p p e t i t e −or −o v e r e a t i n g " :
+[ ] ,
+64
+" Thoughts −that −you −would −be −b e t t e r −off −dead −or −of −hurting −y o u r s e l f −in −
+some −way " :
+[ ] ,
+65
+" Trouble −c o n c e n t r a t i n g −on −things −such −as −reading −the −newspaper −or −
+watching −t e l e v i s i o n " :
+[ ] ,
+66
+" Trouble −f a l l i n g −or −staying −a s l e e p −or −s l e e p i n g −too −much " :
+[ ]
+67
+}
+68
+} ,
+69
+70
+May I
+p r o c e e d
+with
+the
+r e s t
+of
+the
+INPUTS ?
+" " "
+B
+MENTALLLAMA
+B.1
+Example Input and Output
+Input
+1
+# ## INSTRUCTION :
+2
+3
+4
+For a given
+user
+post
+sentence ,
+does
+i t
+show s i g n s
+of
+the symptom .
+Answer in
+binary
+" yes "
+or
+5
+" no " ,
+for
+every symptom .
+The symptoms are
+as
+f o l l o w s :
+6
+[ L i t t l e
+i n t e r e s t
+or
+p l e a s u r e
+in
+doing
+things ,
+7
+8
+F e e l i n g down ,
+depressed ,
+or
+hopeless ,
+9
+10
+Trouble
+f a l l i n g
+or
+s t a y i n g
+asleep ,
+or
+s l e e p i n g
+too much ,
+11
+F e e l i n g
+t i r e d
+or having
+l i t t l e
+energy ,
+12
+13
+Poor
+a p p e t i t e
+or
+overeating ,
+14
+15
+F e e l i n g
+bad
+about
+y o u r s e l f
+or
+t h a t
+you are
+a
+f a i l u r e
+or
+16
+have
+l e t
+y o u r s e l f
+or your
+family down ,
+17
+18
+Trouble
+c o n c e n t r a t i n g
+on things ,
+such
+as
+reading
+the
+19
+newspaper or watching
+t e l e v i s i o n ,
+
+Large Language Models for Mental Health Diagnostic Assessments
+17
+20
+21
+Moving or
+speaking
+so
+slowly
+t h a t
+other
+people
+could
+22
+have
+noticed .
+Or the
+opposite
+being
+so
+f i g e t y
+or
+23
+r e s t l e s s
+t h a t
+you have been moving around a
+l o t
+more
+24
+than
+usual ,
+25
+26
+Thoughts
+t h a t
+you would be
+b e t t e r
+o f f
+dead ,
+or
+of
+27
+hurting
+y o u r s e l f ]
+.
+28
+29
+Give
+the
+output
+as a python
+l i s t
+of
+l i s t s ,
+with
+the
+l i s t
+containing
+the symptom
+and the
+30
+answer ,
+separated
+by a comma .
+31
+32
+33
+34
+# ## INPUT :
+35
+Hello .
+I
+(23 F )
+have
+t r i e d
+to make a
+post
+to
+e x p l a i n
+what ' s ␣going ␣on ␣with ␣me , ␣
+but ␣I ␣j u s t ␣end ␣up ␣crying , ␣and ␣everything ␣I ␣write ␣i s ␣incoherent , ␣so . ␣Sorry ␣
+i f ␣there ' s not enough
+context ?
+36
+37
+I 'm␣having ␣a ␣r e a l l y ␣d i f f i c u l t ␣time ␣r i g h t ␣now . ␣I ␣can ' t
+r e a l l y
+focus on work ,
+and
+I
+don ' t ␣get ␣in ␣as ␣many ␣hours ␣as ␣I ␣should . ␣I ␣f e e l ␣l i k e ␣I ␣am ␣l e t t i n g ␣people ␣
+down .
+38
+39
+E x i s t i n g ␣i s ␣exhausting , ␣and ␣a l l ␣I ␣can ␣do ␣i s ␣waste ␣time ␣on ␣my␣phone , ␣because ␣i f ␣
+I 'm on my phone
+I
+don ' t ␣have ␣to ␣think ␣and ␣time ␣passes ␣more ␣quickly .
+40
+I 'm t i r e d
+of
+spending
+hours on my phone
+i n s t e a d
+of
+doing
+f u n c t i o n a l −people
+things ,
+I 'm␣j u s t ␣pu t ti ng ␣everything ␣o f f ␣and ␣s e t t i n g ␣myself ␣up ␣f o r ␣f a i l u r e . ␣
+But ␣doing ␣anything ␣productive ␣f e e l s ␣too ␣daunting , ␣and ␣I ␣don ' t know how to
+s t a r t ?
+41
+42
+I
+want to
+develop
+healthy
+h a b i t s −spend
+l e s s
+time on my phone ,
+maybe go
+o u t s i d e
+more often ,
+go on walks ,
+s t i c k
+to my work schedule ,
+f i n d
+hobbies .
+Simple
+things
+t h a t
+I know would improve my mental
+health .
+43
+But even though
+I
+want
+those
+things ,
+I
+f e e l
+l i k e
+I 'm␣not ␣motivated ␣enough ␣to ␣
+make ␣a ␣change . ␣I t ' s
+always
+e a s i e r
+to
+stay
+in my comfort
+zone ,
+to
+d i s t r a c t
+myself . My brain
+says
+I
+need
+to
+change ,
+but
+I
+f e e l
+l i k e
+I
+don ' t ␣want ␣i t ␣bad
+␣enough ␣to ␣a c t u a l l y ␣try .
+
+18
+Trovato et al.
+44
+45
+I ␣can ' t
+keep
+l i v i n g
+l i k e
+this ,
+though .
+46
+47
+I ' ve ␣t r i e d ␣looking ␣f o r ␣advice ␣online , ␣but ␣everything ␣I ␣see ␣i n v o l v e s :
+48
+−␣Therapy , ␣which ␣I ␣don ' t
+have money for .
+49
+−Reaching
+out ,
+but
+I
+have
+very few
+people
+I 'm␣c l o s e ␣with , ␣and ␣I ␣don ' t
+f e e l
+comfortable
+t a l k i n g
+about my mental
+health
+to any of them .
+50
+−Self −help books and s t u f f ,
+which
+j u s t . . . does not work on me .
+51
+−Hobbies ,
+but
+I
+don ' t ␣r e a l l y ␣have ␣any ␣of ␣those ␣anymore ? ␣I ' ve been
+depressed
+for
+so long ,
+I ' ve ␣l o s t ␣i n t e r e s t ␣in ␣the ␣ones ␣I ␣used ␣to ␣have ␣as ␣a ␣kid , ␣and ␣
+never ␣developed ␣new ␣ones .
+52
+53
+So ␣I ␣guess ␣I 'm wondering / hoping you
+a l l
+might have some advice on how to
+get
+a
+b i t
+b e t t e r ,
+something
+t h a t
+doesn ' t ␣involve ␣the ␣things ␣I ␣j u s t ␣mentioned ␣?
+54
+55
+I ␣don ' t know .
+I
+wish wanting
+to
+get
+b e t t e r
+was enough
+to
+spur me i n t o
+a c t i o n .
+Sorry
+i f
+what
+I 'm␣asking ␣f o r ␣doesn ' t
+e x i s t ,
+or
+i f
+I
+wasn ' t ␣very ␣c l e a r .
+56
+Thanks ␣f o r ␣reading
+Output
+1
+# ## INSTRUCTION :
+2
+3
+4
+For a given
+user
+post
+sentence ,
+does
+i t
+show s i g n s
+of
+the symptom .
+Answer in
+binary
+" yes "
+or
+5
+" no " ,
+for
+every symptom .
+The symptoms are
+as
+f o l l o w s :
+6
+[ L i t t l e
+i n t e r e s t
+or
+p l e a s u r e
+in
+doing
+things ,
+7
+8
+F e e l i n g down ,
+depressed ,
+or
+hopeless ,
+9
+10
+Trouble
+f a l l i n g
+or
+s t a y i n g
+asleep ,
+or
+s l e e p i n g
+too much ,
+11
+F e e l i n g
+t i r e d
+or having
+l i t t l e
+energy ,
+12
+13
+Poor
+a p p e t i t e
+or
+overeating ,
+14
+15
+F e e l i n g
+bad
+about
+y o u r s e l f
+or
+t h a t
+you are
+a
+f a i l u r e
+or
+16
+have
+l e t
+y o u r s e l f
+or your
+family down ,
+17
+
+Large Language Models for Mental Health Diagnostic Assessments
+19
+18
+Trouble
+c o n c e n t r a t i n g
+on things ,
+such
+as
+reading
+the
+19
+newspaper or watching
+t e l e v i s i o n ,
+20
+21
+Moving or
+speaking
+so
+slowly
+t h a t
+other
+people
+could
+22
+have
+noticed .
+Or the
+opposite
+being
+so
+f i g e t y
+or
+23
+r e s t l e s s
+t h a t
+you have been moving around a
+l o t
+more
+24
+than
+usual ,
+25
+26
+Thoughts
+t h a t
+you would be
+b e t t e r
+o f f
+dead ,
+or
+of
+27
+hurting
+y o u r s e l f ]
+.
+28
+29
+Give
+the
+output
+as a python
+l i s t
+of
+l i s t s ,
+with
+the
+l i s t
+containing
+the symptom
+and the
+30
+answer ,
+separated
+by a comma .
+31
+32
+33
+34
+# ## INPUT :
+35
+Hello .
+I
+(23 F )
+have
+t r i e d
+to make a
+post
+to
+e x p l a i n
+what ' s ␣going ␣on ␣with ␣me , ␣
+but ␣I ␣j u s t ␣end ␣up ␣crying , ␣and ␣everything ␣I ␣write ␣i s ␣incoherent , ␣so . ␣Sorry ␣
+i f ␣there ' s not enough
+context ?
+36
+37
+I 'm␣having ␣a ␣r e a l l y ␣d i f f i c u l t ␣time ␣r i g h t ␣now . ␣I ␣can ' t
+r e a l l y
+focus on work ,
+and
+I
+don ' t ␣get ␣in ␣as ␣many ␣hours ␣as ␣I ␣should . ␣I ␣f e e l ␣l i k e ␣I ␣am ␣l e t t i n g ␣people ␣
+down .
+38
+39
+E x i s t i n g ␣i s ␣exhausting , ␣and ␣a l l ␣I ␣can ␣do ␣i s ␣waste ␣time ␣on ␣my␣phone , ␣because ␣i f ␣
+I 'm on my phone
+I
+don ' t ␣have ␣to ␣think ␣and ␣time ␣passes ␣more ␣quickly .
+40
+I 'm t i r e d
+of
+spending
+hours on my phone
+i n s t e a d
+of
+doing
+f u n c t i o n a l −people
+things ,
+I 'm␣j u s t ␣pu t ti ng ␣everything ␣o f f ␣and ␣s e t t i n g ␣myself ␣up ␣f o r ␣f a i l u r e . ␣
+But ␣doing ␣anything ␣productive ␣f e e l s ␣too ␣daunting , ␣and ␣I ␣don ' t know how to
+s t a r t ?
+41
+42
+I
+want to
+develop
+healthy
+h a b i t s −spend
+l e s s
+time on my phone ,
+maybe go
+o u t s i d e
+more often ,
+go on walks ,
+s t i c k
+to my work schedule ,
+f i n d
+hobbies .
+Simple
+things
+t h a t
+I know would improve my mental
+health .
+
+20
+Trovato et al.
+43
+But even though
+I
+want
+those
+things ,
+I
+f e e l
+l i k e
+I 'm␣not ␣motivated ␣enough ␣to ␣
+make ␣a ␣change . ␣I t ' s
+always
+e a s i e r
+to
+stay
+in my comfort
+zone ,
+to
+d i s t r a c t
+myself . My brain
+says
+I
+need
+to
+change ,
+but
+I
+f e e l
+l i k e
+I
+don ' t ␣want ␣i t ␣bad
+␣enough ␣to ␣a c t u a l l y ␣try .
+44
+45
+I ␣can ' t
+keep
+l i v i n g
+l i k e
+this ,
+though .
+46
+47
+I ' ve ␣t r i e d ␣looking ␣f o r ␣advice ␣online , ␣but ␣everything ␣I ␣see ␣i n v o l v e s :
+48
+−␣Therapy , ␣which ␣I ␣don ' t
+have money for .
+49
+−Reaching
+out ,
+but
+I
+have
+very few
+people
+I 'm␣c l o s e ␣with , ␣and ␣I ␣don ' t
+f e e l
+comfortable
+t a l k i n g
+about my mental
+health
+to any of them .
+50
+−Self −help books and s t u f f ,
+which
+j u s t . . . does not work on me .
+51
+−Hobbies ,
+but
+I
+don ' t ␣r e a l l y ␣have ␣any ␣of ␣those ␣anymore ? ␣I ' ve been
+depressed
+for
+so long ,
+I ' ve ␣l o s t ␣i n t e r e s t ␣in ␣the ␣ones ␣I ␣used ␣to ␣have ␣as ␣a ␣kid , ␣and ␣
+never ␣developed ␣new ␣ones .
+52
+53
+So ␣I ␣guess ␣I 'm wondering / hoping you
+a l l
+might have some advice on how to
+get
+a
+b i t
+b e t t e r ,
+something
+t h a t
+doesn ' t ␣involve ␣the ␣things ␣I ␣j u s t ␣mentioned ␣?
+54
+55
+I ␣don ' t know .
+I
+wish wanting
+to
+get
+b e t t e r
+was enough
+to
+spur me i n t o
+a c t i o n .
+Sorry
+i f
+what
+I 'm␣asking ␣f o r ␣doesn ' t
+e x i s t ,
+or
+i f
+I
+wasn ' t ␣very ␣c l e a r .
+56
+Thanks ␣f o r ␣reading
+C
+AUTOTRAINING Diagnostic𝐿𝑙𝑎𝑚𝑎
+Model details, input format, sample inferences
+C.1
+Example Input and Output
+Input
+1
+# ## INSTRUCTION :
+2
+3
+4
+For a given
+user
+post
+sentence ,
+does
+i t
+show s i g n s
+of
+the symptom .
+Answer in
+binary
+" yes "
+or
+5
+" no " ,
+for
+every symptom .
+The symptoms are
+as
+f o l l o w s :
+6
+[ L i t t l e
+i n t e r e s t
+or
+p l e a s u r e
+in
+doing
+things ,
+7
+8
+F e e l i n g down ,
+depressed ,
+or
+hopeless ,
+9
+
+Large Language Models for Mental Health Diagnostic Assessments
+21
+10
+Trouble
+f a l l i n g
+or
+s t a y i n g
+asleep ,
+or
+s l e e p i n g
+too much ,
+11
+F e e l i n g
+t i r e d
+or having
+l i t t l e
+energy ,
+12
+13
+Poor
+a p p e t i t e
+or
+overeating ,
+14
+15
+F e e l i n g
+bad
+about
+y o u r s e l f
+or
+t h a t
+you are
+a
+f a i l u r e
+or
+16
+have
+l e t
+y o u r s e l f
+or your
+family down ,
+17
+18
+Trouble
+c o n c e n t r a t i n g
+on things ,
+such
+as
+reading
+the
+19
+newspaper or watching
+t e l e v i s i o n ,
+20
+21
+Moving or
+speaking
+so
+slowly
+t h a t
+other
+people
+could
+22
+have
+noticed .
+Or the
+opposite
+being
+so
+f i g e t y
+or
+23
+r e s t l e s s
+t h a t
+you have been moving around a
+l o t
+more
+24
+than
+usual ,
+25
+26
+Thoughts
+t h a t
+you would be
+b e t t e r
+o f f
+dead ,
+or
+of
+27
+hurting
+y o u r s e l f ]
+.
+28
+29
+Give
+the
+output
+as a python
+l i s t
+of
+l i s t s ,
+with
+the
+l i s t
+containing
+the symptom
+and the
+30
+answer ,
+separated
+by a comma .
+31
+32
+33
+34
+# ## INPUT :
+35
+Hello .
+I
+(23 F )
+have
+t r i e d
+to make a
+post
+to
+e x p l a i n
+what ' s ␣going ␣on ␣with ␣me , ␣
+but ␣I ␣j u s t ␣end ␣up ␣crying , ␣and ␣everything ␣I ␣write ␣i s ␣incoherent , ␣so . ␣Sorry ␣
+i f ␣there ' s not enough
+context ?
+36
+37
+I 'm␣having ␣a ␣r e a l l y ␣d i f f i c u l t ␣time ␣r i g h t ␣now . ␣I ␣can ' t
+r e a l l y
+focus on work ,
+and
+I
+don ' t ␣get ␣in ␣as ␣many ␣hours ␣as ␣I ␣should . ␣I ␣f e e l ␣l i k e ␣I ␣am ␣l e t t i n g ␣people ␣
+down .
+38
+39
+E x i s t i n g ␣i s ␣exhausting , ␣and ␣a l l ␣I ␣can ␣do ␣i s ␣waste ␣time ␣on ␣my␣phone , ␣because ␣i f ␣
+I 'm on my phone
+I
+don ' t ␣have ␣to ␣think ␣and ␣time ␣passes ␣more ␣quickly .
+
+22
+Trovato et al.
+40
+I 'm t i r e d
+of
+spending
+hours on my phone
+i n s t e a d
+of
+doing
+f u n c t i o n a l −people
+things ,
+I 'm␣j u s t ␣pu t ti ng ␣everything ␣o f f ␣and ␣s e t t i n g ␣myself ␣up ␣f o r ␣f a i l u r e . ␣
+But ␣doing ␣anything ␣productive ␣f e e l s ␣too ␣daunting , ␣and ␣I ␣don ' t know how to
+s t a r t ?
+41
+42
+I
+want to
+develop
+healthy
+h a b i t s −spend
+l e s s
+time on my phone ,
+maybe go
+o u t s i d e
+more often ,
+go on walks ,
+s t i c k
+to my work schedule ,
+f i n d
+hobbies .
+Simple
+things
+t h a t
+I know would improve my mental
+health .
+43
+But even though
+I
+want
+those
+things ,
+I
+f e e l
+l i k e
+I 'm␣not ␣motivated ␣enough ␣to ␣
+make ␣a ␣change . ␣I t ' s
+always
+e a s i e r
+to
+stay
+in my comfort
+zone ,
+to
+d i s t r a c t
+myself . My brain
+says
+I
+need
+to
+change ,
+but
+I
+f e e l
+l i k e
+I
+don ' t ␣want ␣i t ␣bad
+␣enough ␣to ␣a c t u a l l y ␣try .
+44
+45
+I ␣can ' t
+keep
+l i v i n g
+l i k e
+this ,
+though .
+46
+47
+I ' ve ␣t r i e d ␣looking ␣f o r ␣advice ␣online , ␣but ␣everything ␣I ␣see ␣i n v o l v e s :
+48
+−␣Therapy , ␣which ␣I ␣don ' t
+have money for .
+49
+−Reaching
+out ,
+but
+I
+have
+very few
+people
+I 'm␣c l o s e ␣with , ␣and ␣I ␣don ' t
+f e e l
+comfortable
+t a l k i n g
+about my mental
+health
+to any of them .
+50
+−Self −help books and s t u f f ,
+which
+j u s t . . . does not work on me .
+51
+−Hobbies ,
+but
+I
+don ' t ␣r e a l l y ␣have ␣any ␣of ␣those ␣anymore ? ␣I ' ve been
+depressed
+for
+so long ,
+I ' ve ␣l o s t ␣i n t e r e s t ␣in ␣the ␣ones ␣I ␣used ␣to ␣have ␣as ␣a ␣kid , ␣and ␣
+never ␣developed ␣new ␣ones .
+52
+53
+So ␣I ␣guess ␣I 'm wondering / hoping you
+a l l
+might have some advice on how to
+get
+a
+b i t
+b e t t e r ,
+something
+t h a t
+doesn ' t ␣involve ␣the ␣things ␣I ␣j u s t ␣mentioned ␣?
+54
+55
+I ␣don ' t know .
+I
+wish wanting
+to
+get
+b e t t e r
+was enough
+to
+spur me i n t o
+a c t i o n .
+Sorry
+i f
+what
+I 'm␣asking ␣f o r ␣doesn ' t
+e x i s t ,
+or
+i f
+I
+wasn ' t ␣very ␣c l e a r .
+56
+Thanks ␣f o r ␣reading
+Output
+
+Large Language Models for Mental Health Diagnostic Assessments
+23
+1
+[ [ ' Feeling −bad −about −yourself −or −that −you−are −a−f a i l u r e −or −have −l e t −
+yourself −or −your −family −down ' ,
+' yes ' ] ,
+[ ' Feeling −down−depressed −or −
+hopeless ' ,
+' yes ' ] ,
+[ ' Feeling −t i r e d −or −having −l i t t l e −energy ' ,
+' yes ' ] ,
+[ '
+L i t t l e −i n t e r e s t −or −pleasure −in −doing ␣' ,
+' yes ' ] ,
+[ ' Moving−or −speaking −so
+−slowly −that −other −people −could −have −noticed −Or−the −opposite −being −so −
+fidgety −or −r e s t l e s s −that −you−have −been −moving−around −a−lot −more−than −
+usual ' ,
+' no ' ] ,
+[ ' Poor −a p pe t i t e −or −o ve r e at i n g ' ,
+' no ' ] ,
+[ ' Thoughts −that −
+you−would −be −b e t t e r −off −dead −or −of −hurting −yourself −in −some−way ' ,
+' no '
+] ,
+[ ' Trouble −concentrating −on−things −such −as −reading −the −newspaper −or −
+watching −t e l e v i s i o n ' ,
+' yes ' ] ,
+[ ' Trouble −f a l l i n g −or −staying −asleep −or −
+sleeping −too −much ' ,
+' no ' ] ]
+D
+TRADITIONAL MACHINE LEARNING-BASED APPROACHES
+Table 14. Evaluation of Traditional ML-based methods for PHQ-9 Symptom Annotations of the PRIMATE Posts Using F1 scores.
+Method
+F1-score
+Logistic Regression
+0.49
+Random Forest
+0.38
+XGBoost
+0.65

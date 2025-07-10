@@ -1,0 +1,9 @@
+sentence-transformers
+transformers
+huggingface-hub
+torch
+faiss-cpu
+llama-cpp-python
+numpy
+tqdm
+fitz

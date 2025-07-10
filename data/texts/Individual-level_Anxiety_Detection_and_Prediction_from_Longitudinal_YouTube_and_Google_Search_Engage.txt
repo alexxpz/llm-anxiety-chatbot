@@ -1,0 +1,1100 @@
+Individual-level Anxiety Detection and Prediction from
+Longitudinal YouTube and Google Search Engagement Logs
+Anis Zaman
+University of Rochester
+azaman2@cs.rochester.edu
+Boyu Zhang
+University of Rochester
+bzhang25@u.rochester.edu
+Henry Kautz
+University of Rochester
+henry.kautz@gmail.com
+Vincent Silenzio
+Rutgers University
+vincent.silenzio@rutgers.edu
+Ehsan Hoque
+University of Rochester
+mehoque@gmail.com
+ABSTRACT
+Anxiety disorder is one of the world’s most prevalent mental health
+conditions, arising from complex interactions of biological and en-
+vironmental factors and severely interfering one’s ability to lead
+normal life activities. Current methods for detecting anxiety heav-
+ily rely on in-person interviews, which can be expensive, time-
+consuming, and blocked by social stigmas. In this work, we propose
+an alternative method to identify individuals with anxiety and fur-
+ther estimate their levels of anxiety using personal online activity
+histories from YouTube and the Google Search engine, platforms
+that are used by millions of people daily. We ran a longitudinal
+study and collected multiple rounds of anonymized YouTube and
+Google Search logs from volunteering participants, along with their
+clinically validated ground-truth anxiety assessment scores. We
+then developed explainable features that capture both the temporal
+and contextual aspects of online behaviors. Using those, we were
+able to train models that (i) identify individuals having anxiety
+disorder with an average F1 score of 0.83 ± 0.09 and (ii) assess
+the level of anxiety by predicting the gold standard Generalized
+Anxiety Disorder 7-item scores (ranges from 0 to 21) with a mean
+square error of 1.87 ± 0.15 based on the ubiquitous individual-level
+online engagement data. Our proposed anxiety assessment frame-
+work is cost-effective, time-saving, scalable, and opens the door
+for it to be deployed in real-world clinical settings, empowering
+care providers and therapists to learn about anxiety disorders of
+patients non-invasively at any moment in time.
+CCS CONCEPTS
+• Information systems →Web search engines; • Applied com-
+puting →Health informatics; Psychology; • Human-centered
+computing →Empirical studies in HCI.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+Woodstock ’18, June 03–05, 2018, Woodstock, NY
+© 2018 Association for Computing Machinery.
+ACM ISBN 978-1-4503-XXXX-X/18/06...$15.00
+https://doi.org/10.1145/1122445.1122456
+KEYWORDS
+anxiety, mental health, prediction, Google Search history, YouTube
+history
+ACM Reference Format:
+Anis Zaman, Boyu Zhang, Henry Kautz, Vincent Silenzio, and Ehsan Hoque.
+2018. Individual-level Anxiety Detection and Prediction from Longitudinal
+YouTube and Google Search Engagement Logs. In Woodstock ’18: ACM
+Symposium on Neural Gaze Detection, June 03–05, 2018, Woodstock, NY. ACM,
+New York, NY, USA, 10 pages. https://doi.org/10.1145/1122445.1122456
+1
+INTRODUCTION
+According to the World Health Organization (WHO), 1 in 13 people
+suffers from anxiety globally, making it one of the most prevalent
+mental health concerns. In the United States, it is the second lead-
+ing cause of disability among all psychiatric disorders [67]. Nearly
+40 million people (age 18 and older) experienced anxiety disorder
+in any given year, yet only 35.9% of those suffered received treat-
+ments1. A study in 2017 reported that the level of anxiety among
+young adolescents has been gradually increasing in recent years [7].
+The population most vulnerable to anxiety disorder is the stu-
+dents in high school and early college years. A report by the Amer-
+ican College Health Association in 2018 stated that 63% of college
+students in the U.S. felt overwhelming anxiety during the last 12
+months, and only 23% of these students were either diagnosed or
+treated for an anxiety disorder by a professional mental healthcare
+provider [3]. During the early days of college, students are separated
+from their traditional support system and find themselves in chal-
+lenging social and academic settings such as living with roommates,
+developing independent identities, making new friends, managing
+heavy workloads, etc. All these experiences induce spikes in anxiety
+from time to time [48], and this psychological distress increases
+during the first few semesters of college [10]. Furthermore, it has
+been reported that anxiety disorders are significantly associated
+with other medical and psychiatric comorbidities [14]. Despite such
+a high prevalence of anxiety among young adolescents, current
+methods for detecting anxiety disorders consist of self-assessment
+surveys and in-person interviews, which can be time-consuming,
+expensive, lack precision, and hampered by factors such as fear,
+concealing information, and social stigma related to the mental
+health issue.
+Engagements in online platforms are major components in the
+lives of young adults [29]. On average, an internet user spent
+1https://adaa.org/understanding-anxiety
+arXiv:2007.00613v2  [cs.HC]  30 Nov 2020
+
+Woodstock ’18, June 03–05, 2018, Woodstock, NY
+Anis Zaman, Boyu Zhang, Henry Kautz, Vincent Silenzio, and Ehsan Hoque
+the equivalent of more than 100 days online during the last 12
+months [63]. It has been reported that 81% of U.S internet users
+aging between 15 to 25 use YouTube2 regularly. Besides, an average
+internet user uses Google Search at least once a day, and many
+search dozens of times a day3. Extensive studies have been done
+trying to correlate mental health issues with popular public social
+media data such as Facebook [6, 40, 42] and Twitter [9, 11, 13, 23],
+yet they may fail to cover people who interact infrequently with
+social media or post false positive impressions publicly [21]. In
+contrast, individual-level search and YouTube logs are ubiquitous
+and private for each user and are less likely to be subject to self-
+censorship. A group of researchers has shown that search logs can
+be used as a proxy for detecting mental health issues [1, 28, 71].
+We draw inspirations from these prior works and hypothesize that
+private Google Search engine logs and YouTube histories can leave
+a detailed digital trace of the mental health states of users and be
+used as a proxy to assess the level of anxiety for individuals.
+In this work, we propose a framework that leverages individual-
+level online activities logs, in particular, Google Search and YouTube
+activity histories, to identify individuals with anxiety disorder and
+further predict their level of anxiety. We ran a longitudinal study
+to gather two rounds of data, with 5 months in-between, from a
+college population. During each round, participants shared their
+anonymized online activity histories along with their answers to a
+clinically validated questionnaire for measuring Generalized Anxi-
+ety Disorder (GAD-7) [59]. We then developed an explainable low-
+dimensional vector representation that captures different aspects of
+one’s online behaviors, including temporal activity patterns, time
+and semantic diversities, and periods of inactivity. Using these fea-
+ture representations, we trained models that can accurately detect
+and predict one’s level of anxiety from online activities. Unlike [71]
+who merely focused on mental health issue detection such as self-
+esteem from Google Search histories, our data incorporates both
+Google Search as well as YouTube activities history, and our two
+rounds of data facilitate both the detection and prediction tasks. Fur-
+thermore, we conduct our experiment with a framework that fits
+possible real-world applications. We envision our work as an impor-
+tant step towards helping caregivers better understand and engage
+with their patients without additional burden through passive data
+and ubiquitous computing.
+In summary, this work is unique in that (i) we are the first to
+run a longitudinal study where individual-level Google Search and
+YouTube histories along with gold-standard clinically validated
+anxiety assessment are gathered; (ii) we define explainable features
+that capture both the semantic and temporal aspects of online ac-
+tivities, including a novel representation of periods of activity and
+inactivity based on temporal point processes; (iii) using these fea-
+tures, we managed to both detect and predict the anxiety disorder
+of an individual with high performances, showing that ubiquitous
+private online logs contain strong signals that can potentially be
+a proxy to assess mental health issues; and (iv) our pioneered two
+rounds of data and light-weight experiment setup has strong soci-
+etal implications and can empower care providers to estimate the
+anxiety levels of patients remotely through a non-invasive manner.
+2https://www.statista.com/statistics/296227/us-youtube-reach-age-gender/
+3https://bit.ly/382vgWD
+2
+RELATED WORK
+Public social media, blogs, and forums have become popular data
+sources for researchers to study the prevalence of mental health
+conditions. [57] showed that the usage of social media sites cor-
+relates with user depression and anxiety. Tweets, one of the most
+explored social media platform, has been used to detect insom-
+nia [27], suicidal ideations [18], depressed individuals [17], the
+extent of depression [64], and languages related to depression and
+PTSD [12, 46, 49, 50]. Besides, [16] have shown that Facebook status
+can be used to predict postpartum depression and monitor depres-
+sion [56]. Other researchers have leveraged data from Reddit to
+study mental distress among adolescents [5]. [18] identified shifts
+in language may indicate future suicidal ideations. De Choudhury
+et al. provides a comprehensive overview of the role of social media
+in mental health researches [15] and evaluation methodologies [9].
+Social media users constitutes only a fraction of the general popu-
+lation, and a small number of them, with particular personalities
+or demographics, typically acts out in social media that may re-
+veal signs of mental health struggles. Hence, findings based on
+social media platforms may not generalize to the majority of the
+population.
+A large number of researchers have leveraged sensors, such as
+smartphone and mobile apps, that are embedded in our daily life
+experiences to capture various aspects of mental health [38, 65]. For
+example, sensor data has been used for studies of anxiety [19, 47, 51],
+stress [39, 55], moods [33, 34], and depression [53, 54, 66]. Several
+research groups have developed applications to help users man-
+age stress and anxiety [35, 45] and evoke positive emotions [2].
+However, smartphone applications for tackling mental health is-
+sues have several limitations: (i) not every mental health patient
+have access to smartphones; (ii) any interventions delivered via
+apps is less likely to be as effective as face-to-face sessions with
+a therapists [72]; (iii) the app may fail and require developers to
+constantly keep it updated, which is costly and not sustainable.
+One data source that can capture in-the-moment thoughts and
+feelings of a broad range of people are search engine logs, which
+may fill in the gap for continuous monitoring applications [38].
+Researchers have used population-level search engine logs from
+Google Trends to monitor depression and suicide-related behav-
+iors [24, 36, 60, 70], identify seasonality in seeking mental health
+information [4], and show heavy usages for screening diseases [43]
+such as pancreatic cancer [44]. A comprehensive review of the us-
+age of Google Trends in the healthcare domain has been provided
+by [41]. A crucial difference between these previous works and ours
+is that we aim to accurately predict the mental health of particular
+individuals, not general populations. Unlike population-level online
+engagement logs in Google Trends, our individual-level activity
+logs are more likely to fit the fabric of one’s daily life experience.
+3
+DATA
+The longitudinal data collected for this work consisted of individual-
+level Google Search logs, YouTube history, and clinical survey re-
+sponses that are very personal and sensitive in nature. Similar
+to [71], we leveraged a cloud-based data collection process using
+Google Takeout4, a web interface that enables Google product
+4http://takeout.google.com/
+
+Individual-level Anxiety Detection and Prediction from Longitudinal YouTube and Google Search Engagement Logs
+Woodstock ’18, June 03–05, 2018, Woodstock, NY
+Figure 1: Obtaining data from an individual
+users to export their Google Search and YouTube activity histories.
+Our cloud-based data collection pipeline (see Figure 1) has been
+thoroughly vetted by the Institutional Review Board (IRB) of our
+institution in order to ensure the privacy and safety of subjects.
+3.1
+Study Recruitment Procedure
+The study ran for 5 months starting in August, 2019. Participation
+was voluntary, and one needed to be at least 18-year-old and have a
+Google account to qualify for the study. The recruitment procedure
+was designed as an one-on-one interview. During the recruitment,
+participants answered the 7-item Generalized Anxiety Disorder
+questionnaire, a clinically validated tool for assessing anxiety disor-
+der, in addition to their GPA, gender, and demographics. Following
+that, participants signed in to Google Takeout with their Google
+accounts and initiated the Google Search and YouTube activity
+history data download process. Before the data was shared with
+the research team, all sensitive information such as name, email,
+phone number, social security, and financial information (banking
+and credit card) was redacted and anonymized using Google’s Data
+Loss Prevention (DLP) API [30, 31].
+In total, we collected two rounds of data. The recruitment pro-
+cedure above was performed during each round. In August 2019,
+104 qualified college college students participated in the first round.
+For the rest of the paper, we will refer this round of data as the
+first-round data.
+Five months later, we invited all 104 participants from first-round
+for follow-up and were able to follow up with 72 individuals. We
+collected their Google and YouTube activity histories again, along
+with the survey responses for the second time. For the rest of the
+paper, we will refer to data collected in the second round as the
+follow-up data. Therefore, there are in total 72 people participated
+in both rounds and 104 −72 = 32 people participated only in
+the first-round. The overall recruitment timeline and participant
+statistics are shown in Figure 2. All participants were compensated
+with $10 Amazon gift cards at the beginning during each round
+of participation. About 34% of our participants are male and 65%
+female. Figure 3(a) presents a comprehensive breakdown of the
+demographics of the study population.
+3.2
+Ground Truth via Survey
+The ground truth about one’s anxiety disorder was measured us-
+ing the Generalized Anxiety Disorder (GAD-7) [59], a clinically
+validated questionnaire (7 questions5) which has been reported
+to be quite accurate in accessing the severity of anxiety [61]. The
+questions in GAD-7 were prefixed with a text for the temporal
+context, for example, Over the last six months, how often have you
+been bothered by the following problems? The responses were com-
+piled to compute an anxiety score. The 21 points scale GAD-7 is a
+commonly used in clinical diagnosis where score of 5, 10, and 15
+5https://www.mdcalc.com/gad-7-general-anxiety-disorder-7
+Figure 2: Timeline and participants for two rounds of data
+collection. There are in total 104 unique individuals partic-
+ipated in the study, and 72 of them participated in both
+the first-round and the follow-up.
+Figure 3: Study population breakdown: (a) Demographics of
+the participants. (b) Distributions of subjects with/without
+anxiety conditions during the first and the follow-up rounds,
+computed based on the survey response via the GAD-7 ques-
+tionnaire.
+are treated as cutoffs for mild, moderate, and severe anxiety levels,
+respectively. Further follow-up and evaluation are recommended
+for someone with anxiety score greater than 9 [69], and we used
+the recommended score of 9 as a cutoff to label individuals with
+anxiety disorder. In this work, any individual with GAD-7 score > 9
+is labelled as Anxious, and someone with score ≤9 is labelled as
+Not-anxious. Figure 3(b) shows the breakdown after the anxiety cut-
+off. Figure 4 shows the distribution and changes of anxiety scores
+for all the participants who participated in both the first-round and
+the follow-up. We observed that the anxiety score increased for 22
+individuals, decreased for 32 people, and remain unchanged for 18
+participants. It is worth noticing that, 9 participants had a change
+in GAD-7 score which is clinically significant (the absolute value
+of the change ≥5) during the 5 months of study.
+3.3
+YouTube & Google Search History
+For this study, we collect individual-level online engagement logs
+from YouTube and Google Search engine using the Google Takeout
+interface. Google ties all online activities using the Google account
+associated to the user. The Takeout platform aggregates user en-
+gagement logs from all different sources and makes it available for
+easy accessibility. This means that as long as someone is logged into
+his/her/their Google account, all engagements are recorded and
+unified under the single Google account regardless of which device
+
+Woodstock ’18, June 03–05, 2018, Woodstock, NY
+Anis Zaman, Boyu Zhang, Henry Kautz, Vincent Silenzio, and Ehsan Hoque
+Figure 4: GAD-7 scores during the first-round and follow-up.
+Red lines represent an increase, and green lines represent
+unchanged or decrease in anxiety scores. Multiple lines orig-
+inating from one score means that there are more than one
+person having that anxiety score.
+was used. For every person, the online activity history spanned
+(on average) over 5.7 years. In total, 1,966,400 Google searches and
+1,055,847 YouTube interactions were made by all the participants.
+Every engagement on YouTube and Google Search engine is
+timestamped along with the information whether it is the result
+of watching or searching. For YouTube activity logs, we use the
+YouTube API to extract meta-data about the videos that has been
+watched, which includes the title, category, video length, rating,
+number of likes, number of dislikes, etc. Any video living in the
+YouTube ecosystem has an associated category label to it, and this
+enables us to get more context about the video. For Google Search
+activities, we label every search query text using the content classi-
+fication feature of the Google Cloud NLP API 6. Given a query, the
+API returns one or more possible category labels for the text along
+with a confidence score. When applicable, we select the category
+label with the highest confidence. The API returns a hierarchical
+label for every query, and we consider the root level in the hierarchy
+as the category label for the query. For instance, for a query 𝑞, if
+the label from the API is “/News/Sports”, we consider “News” as
+the category for 𝑞. The comprehensive lists of all the categories for
+both search queries and YouTube videos are listed in [22] and [62].
+4
+FEATURE EXTRACTION FROM ONLINE
+DATA
+In this section, we explain how we extracted explainable features
+from online history logs for each participant. Individual-level online
+engagement logs from YouTube and Google Search engine provides
+an unique opportunity to capture what may be going through one’s
+mind at any given time. Since online activities are timestamped,
+one can investigate the weekday/weekend activity frequency and
+variance, calculate the contextual and temporal variability of these
+activities, and estimate daily sleeping/resting duration, etc. For
+example, Figure 5 demonstrates the distribution of activities on
+YouTube and Google Search engine over a week for a specific indi-
+vidual in our dataset. We observe the bursty nature of incidences
+of these activities which we will leverage to construct features
+later in the section. On aggregating daily activities we found that
+there are higher number of interactions on these two platforms
+at the beginning of the week, and, as the week progresses, the
+6https://cloud.google.com/natural-language/docs/classifying-text
+Figure 5: Example online activities distribution from a par-
+ticipant over a week, including both Google Search and
+YouTube activities. Each row is a day, and each ‘|’ bar rep-
+resents a single online activity. The histogram on the right
+side show the total online activities for each day. Notice the
+burstiness of daily online activities.
+number decreases. One possible explanation for drops in activities
+during weekends can be that people are probably spending less
+time interacting on internet and more time relaxing, socializing,
+and connecting with people around them. Notice that each of the
+following feature is a scalar and is calculated for each individual
+participant. In total, we explored five types of features, and each
+has a number of variants, as described below.
+4.1
+Activity Mean and Variance
+We define the activity mean and variance to measure the overall
+distribution of an individual’s online interactions on YouTube and
+Google Search engine. We calculate the daily and weekly mean and
+variance of number of activities on YouTube and Google Search
+for each participant separately, and take the normalized log of the
+mean and variance for numerical stability.
+4.2
+Category (𝐶𝐻) & Time (𝑇𝐻) Entropy
+Every online activity has two components associated with it, namely
+its category and the timestamp of its occurrence. Drawing inspi-
+ration from information theory [58], we define category entropy,
+𝐶𝐻, as a measure of how diverse an individual’s online activities
+are in terms of the semantic context. For an individual 𝑝, based on
+his/her/their online data, we compute the category entropy in the
+following way:
+𝐻𝑝(𝐶𝑎𝑡𝑒𝑔𝑜𝑟𝑦) = −
+𝑚
+∑︁
+𝑖=1
+𝑃𝑖× log(𝑃𝑖)
+(1)
+where 𝑚is the number of distinct categories in the online activities
+of 𝑝, and 𝑃𝑖is the percentage of activities that belong to category
+𝑖. A high entropy indicates that 𝑝interacts more uniformly across
+different categories online, whereas lower entropy indicates larger
+inequality in the number of online activities across the categories.
+Considering that individuals may have different habits during week-
+days and weekends, we also calculated the category entropy for
+weekdays and weekends separately. We include the total, weekday,
+and weekend category entropy as features for each individual. We
+denote them as 𝐶𝑤𝑒𝑒𝑘𝑑𝑎𝑦
+𝐻
+, 𝐶𝑤𝑒𝑒𝑘𝑒𝑛𝑑
+𝐻
+, and 𝐶𝑡𝑜𝑡𝑎𝑙
+𝐻
+.
+Similarly, we define time entropy, 𝑇𝐻, as a measure of how di-
+verse an individual’s online activities are in terms of when it hap-
+pens. We define the discrete bins for time entropy as the 24 hours
+
+Individual-level Anxiety Detection and Prediction from Longitudinal YouTube and Google Search Engagement Logs
+Woodstock ’18, June 03–05, 2018, Woodstock, NY
+of a day. For a person 𝑝, time entropy is computed as below:
+𝐻𝑝(𝑇𝑖𝑚𝑒) = −
+24
+∑︁
+𝑖=1
+𝑃𝑖× log(𝑃𝑖)
+(2)
+where the summation is taken over the 24 hour marks, and 𝑃𝑖
+is the percentage of activities that happen during hour 𝑖. A high
+entropy indicates that 𝑝interacts with YouTube and Google Search
+engine more uniformly across different times of a day, whereas
+lower entropy indicates larger inequalities of numbers of online
+activities between different hours in a day. Similar to Category
+Entropy, we obtain the time entropy for weekdays and weekends
+separately. We denote them as 𝑇𝑤𝑒𝑒𝑘𝑑𝑎𝑦
+𝐻
+, 𝑇𝑤𝑒𝑒𝑘𝑒𝑛𝑑
+𝐻
+, and 𝑇𝑡𝑜𝑡𝑎𝑙
+𝐻
+.
+4.3
+Online Activities Temporality {𝛾, 𝛼, 𝛽}
+We observed that there is a bursty nature of online activities when
+plotted on the time axis (see Figure 5) which resulted in clusters of
+online activities regardless of Google Searches or YouTube histories.
+In other words, we can view the incidences of online activities as a
+Temporal Point Process and investigate individual-level online be-
+haviors from a temporal point of view, such as the Inter-event Times
+(IETs). We enrich our temporal feature by assuming dependencies
+between past activities and the next activity. The intuition is that
+every occurrence of an online activity increases the probability
+of future online activities, and the probability of the next activity
+decays with time. Hence, such process, called a self-exciting point
+process, can be modeled by the Hawkes Process [26], which has
+been widely used for modeling online data and social media activi-
+ties at a population level [52]. Specifically, we define a univariate
+Hawkes Process with an exponential decay kernel as
+𝜆(𝑡) = 𝛾+
+∑︁
+𝑡𝑖<𝑡
+𝛼𝛽exp (−𝛽(𝑡−𝑡𝑖))
+(3)
+where 𝜆(𝑡) represents the probability (intensity) of an activity oc-
+curs at time 𝑡, 𝛾is the background intensity of an activity happens
+exogenously, 𝛼represents the infectivity factor which controls the
+average number of new activities triggered by any past activity, and
+𝛽is the decay rate where 1
+𝛽represents how much time has passed
+by, on average, between the previous event and the next event.
+By fitting the above Hawkes Process to each individual online his-
+tory log, we obtain a unique set of {𝛾, 𝛼, 𝛽} for each participant as
+features. We keep the notations as {𝛾, 𝛼, 𝛽} for this set of features.
+4.4
+Inactivity Period I
+It has been reported that YouTube is becoming the modern day
+classroom for students [20] and provides new ways to consume
+contents for virtually every age groups [8]. However, spending too
+much time on any platform can lead to internet addition [25], in
+particular the YouTube addiction [37] and the compulsive usage of
+YouTube [32], which are quite prevalent among college population.
+These previous findings have inspired us consider feature that can
+be treated as a proxy to capture the time away from internet of
+each participant, and we call it the inactivity period I.
+We focus on periods of time when no Google Search nor YouTube
+activity was performed of each individual. Given the online activity
+log of a participant and a duration threshold of 𝑘hours, we pick
+out all the inactive periods longer than 𝑘hours and investigate
+when they happened most frequently. Specifically, for all inactivity
+periods longer than 𝑘hours, we first calculate the midpoint times-
+tamp for each of them. For example, for an 8-hour inactivity period
+starting at 11 P.M. and ending at 7 A.M., the midpoint is 3 A.M.
+We found that, for all our participants and 𝑘∈{8, 9, 10}, all the
+midpoint modes fall in-between 5 to 8 A.M., which are most likely
+to be the middle of sleeping periods. Notice that, for the inactivity
+defined here, we are focusing on when it occurs most frequently
+for each individual. Hence, it is not suitable to take the mean and
+variance of inactivity midpoints. We included the modes of mid-
+points for thresholds 𝑘∈{8, 9, 10} for each individual as features.
+We denote, for threshold 𝑘∈{8, 9, 10}, the inactivity mode features
+as I8, I9, and I10.
+Overall, we developed 16 features (including variants) form the
+online activities (YouTube and Google Search engine) of each in-
+dividual: 4 from Activity Mean & Variance; 3 from each of the
+Category Entropy 𝐶𝐻, Time Entropy 𝑇𝐻, Online Activities Tempo-
+rality {𝛾, 𝛼, 𝛽}, and Inactivity Periods I.
+5
+MODELING ANXIETY
+Following the clinical anxiety score cutoff threshold [59], partic-
+ipants with GAD-7 score > 9 were labelled as anxious subjects,
+and those with score ≤9 were labelled as non-anxious subjects.
+Overall, there were 60 out of 104 subjects with anxiety conditions
+in the first-round and 40 out of 72 participants with anxiety condi-
+tions during the follow-up. Given one’s YouTube and Google Search
+activity history, we explore: (i) Can we identify individuals with
+anxiety condition through his/her/their online data? (ii) Can we
+predict anxiety score based on online activities and past anxiety
+levels?
+5.1
+Notations and Definitions
+The feature vectors for the first-round are extracted using the most
+recent 12 months of data (the grey box in Figure 2) before the
+completion of the first-round survey. We denote this by 𝒙1 ∈R16.
+Unless mentioned specifically, 𝒙1 is the concatenation of all 16
+scalar features in Section 4 in the same order for each individual.
+The corresponding GAD-7 scores, gathered via the survey (the
+green box in Figure 2) during the first-round, are denoted as 𝑦1.
+Similarly, for the follow-up round, the feature vectors are extracted
+solely from the 5 months of online history data (the blue box in
+Figure 2) in-between the first-round and the follow-up, and we
+denote it as 𝒙2 ∈R16. The corresponding GAD-7 scores, provided
+in the follow-up survey, (the magenta box in Figure 2), are denoted
+as 𝑦2. Therefore, there are in total 104 (𝒙1,𝑦1) pairs from first-round
+and 72 (𝒙2,𝑦2) pairs from follow-up (see Figure 2 & Section 3.1).
+5.2
+Classifying Individuals with Anxiety
+Here, we treat the problem as a binary classification task: given
+the online activity history, we aim to identify if the subject
+has anxiety condition. Assuming online activity histories are
+independent for every person, there are 104 + 72 = 176 segments
+(𝒙1 and 𝒙2) of online history in total, regardless of collected from
+which round or whom, as observation data with respective anxiety
+scores as labels. Formally, we are interested in 𝑃(𝑦| 𝒙), where 𝑦is
+the binary anxiety label from the GAD-7 scores cutoff of 9.
+
+Woodstock ’18, June 03–05, 2018, Woodstock, NY
+Anis Zaman, Boyu Zhang, Henry Kautz, Vincent Silenzio, and Ehsan Hoque
+Figure 6: ROC curves for Random Forests to classify indi-
+viduals with anxiety. We carried out a stratified 5-fold cross-
+validation. The grey area represents ±1 standard deviation.
+Figure 7: The performance of RF and LR on the anxiety
+classification task. We carried out a stratified 5-fold cross-
+validation. The values after the ± sign represent 1 standard
+deviation. Numbers inside ( ) and < > are for LR and RF, re-
+spectively.
+We trained logistic regression (LR), linear support vector ma-
+chine (SVM), and random forest (RF) classifiers on this task and
+performed stratified 5-fold cross-validations, respectively. Since the
+performances of LR and linear SVM were comparable, we report
+the performance of LR. However, RF significantly outperformed the
+other two with an average F1 score of 0.83 ± 0.09 and ROC AUC
+of 0.91 ± 0.06. The detailed precision, recall, and F1 scores for each
+class/average are reported in Figure 7. In Figure 6, we present the
+average ROC curve with standard deviations of the RF.
+5.2.1
+Possible Dependency between Two Rounds. There are 72 out
+of 104 individuals who participated in both rounds of the study.
+Each of them has two pairs of data, (𝒙1,𝑦1) from the first-round
+and (𝒙2,𝑦2) from the follow-up. During the cross-validation for the
+classifiers, we manually ensured that any two pairs of data from
+a same participant either both belong to the training set or both
+belong to the testing set. We employed this to limit any personal
+traits or online habits, on Google Search and YouTube platform,
+from getting incorporated to our supervised classifiers, i.e., 𝒙1 ≈𝒙2
+and 𝑦1 ≈𝑦2 for the same subject. We also experimented ordinary
+cross-validation without such precaution, and we observed 1 ∼2%
+performance increases over the metrics, indicating a small amount
+of potential data dependency.
+5.3
+Predicting Anxiety for Individuals
+In this section, we consider the anxiety score prediction task: given
+the online data and the past anxiety level of an individual,
+we aim to estimate the future GAD-7 score for that individ-
+ual. Concretely, given the two rounds of data, we aim to predict
+the GAD-7 score in the follow-up round given the online history
+data and the GAD-7 score from the first-round of an individual.
+Formally, this task is regarded as a regression problem, and we are
+interested in 𝑃(𝑦2 | 𝒙1, 𝒙2,𝑦1).
+Features for the regression task: for predicting anxiety scores,
+𝑦2, in the above setup, we consider the weekday/weekend Time &
+Category entropy {𝐶𝑤𝑒𝑒𝑘𝑑𝑎𝑦
+𝐻
+,𝐶𝑤𝑒𝑒𝑘𝑒𝑛𝑑
+𝐻
+,𝑇𝑤𝑒𝑒𝑘𝑑𝑎𝑦
+𝐻
+,𝑇𝑤𝑒𝑒𝑘𝑒𝑛𝑑
+𝐻
+}, the
+Temporality parameters {𝛾, 𝛼, 𝛽}, and the Inactivity Periods with
+thresholds of 9 and 10 hours {I9, I10} as input features. Thus, for
+the rest of the section, 𝒙1, 𝒙2 ∈𝑅9 for all individuals.
+We hypothesize that the change in online behaviors may pre-
+serve information about the change in anxiety level. To leverage
+this in the prediction task, we define the following feature vectors
+for the regression models:
+Δ𝒙= 𝒙1 −𝒙2 ∈R9
+(4)
+𝒙𝑔𝑝= [𝜂⊙𝒙2, (1 −𝜂) ⊙Δ𝒙] ∈R2×9
+(5)
+𝒙𝑟𝑒𝑔= [𝜂⊙𝒙2, (1 −𝜂) ⊙Δ𝒙
+|                    {z                    }
+𝒙𝑔𝑝
+,𝑦1] ∈R2×9+1
+(6)
+where the square bracket indicates concatenation, 𝜂∈[0, 1] is a
+hyperparameter that controls the weight on 𝒙2 and Δ𝒙, and ⊙de-
+notes an element-wise multiplication. 𝒙𝑔𝑝is a trivial modification
+of 𝒙𝑟𝑒𝑔by slicing out the last entry 𝑦1 and keeping only the online
+data features. The intuition is that Δ𝒙captures the shift in online
+behaviors between two rounds; 𝒙2 is the most recent online obser-
+vation in predicting 𝑦2; 𝑦1 acts as a base point of 𝑦2; 𝜂weights the
+importance between Δ𝒙and 𝒙2.
+We chose 𝜂= 0.9 and fed the 𝒙𝑟𝑒𝑔as inputs. For this anxiety
+prediction task, we first trained two models: Ordinary Least Squares
+regression (OLS) and Gradient Boosting regression (GB). The GB
+outperformed OLS significantly and achieved an average mean
+square error (MSE) of 2.29 ± 0.25 in predicting future GAD-7 scores
+𝑦2 (see Figure 8).
+Instead of merely looking for the best prediction given by maxi-
+mum likelihood estimations, it is crucial to assess the uncertainty
+over the model and take a Bayesian perspective, especially given
+we are working with healthcare applications with limited sample
+size. Moreover, it would grant much flexibility if the regression is
+not limited to parametric linear form but in a functional space with
+non-linearity, investigating the distribution of functions. Therefore,
+we performed the regression task with a non-parametric Bayesian
+method, the Gaussian Process (GP) [68]. We define our regression
+function as 𝑓(𝒙𝑟𝑒𝑔), and it follows the GP below:
+𝑓(𝒙𝑟𝑒𝑔) ∼GP
+
+𝑚(𝒙𝑟𝑒𝑔),𝑘(𝒙𝑟𝑒𝑔, 𝒙′
+𝑟𝑒𝑔)
+
+(7)
+𝑚(𝒙𝑟𝑒𝑔) = 𝑦1
+(8)
+𝑘(𝒙𝑟𝑒𝑔, 𝒙′
+𝑟𝑒𝑔) = 𝑒𝑥𝑝
+ 
+−
+∥𝒙𝑔𝑝−𝒙′𝑔𝑝∥2
+2ℓ
+!
+(9)
+𝑦2 = 𝑓(𝒙𝑟𝑒𝑔) + 𝜖where 𝜖∼N (0, 𝜎)
+(10)
+
+Individual-level Anxiety Detection and Prediction from Longitudinal YouTube and Google Search Engagement Logs
+Woodstock ’18, June 03–05, 2018, Woodstock, NY
+where 𝑚(𝒙𝑟𝑒𝑔), the mean of the GP, is a deterministic function that
+returns the corresponding previous anxiety score 𝑦1 for each sub-
+ject. The covariance matrix is obtained by an exponential quadratic
+kernel 𝑘over all pairs of individual online data, (𝒙𝑔𝑝, 𝒙′𝑔𝑝). It entails
+that, given any pair of individuals, the closer the distance between
+their online activity features in the vector space, the greater the cor-
+relation between their anxiety scores 𝑦2 (close to 1), and vice versa
+(close to 0). ℓis a hyperparameter that controls the length scale
+between data points: the greater the ℓ, the smoother the function.
+We further assume that the true 𝑦2 equals to the function predic-
+tion plus an independent unknown Gaussian noise 𝜖, and 𝜎is the
+hyperparameter for the noise distribution. The above GP gave us a
+prior belief over the possible regression functions. The intuition is
+that, in the output space of our function 𝑓(𝒙𝑟𝑒𝑔), the future GAD-7
+anxiety scores, 𝑦2, are normally distributed with a mean of the
+previous anxiety scores, 𝑦1. The correlations between different 𝑦2
+values are determined by the similarities between online activities
+𝒙𝑔𝑝from the input space.
+In order to assess the performance of our GP over the test set,
+we first obtained the predictive posterior:
+𝑃
+
+𝑓
+
+𝒙𝑡𝑒𝑠𝑡
+𝑟𝑒𝑔
+
+| 𝑓
+
+𝒙𝑡𝑟𝑎𝑖𝑛
+𝑟𝑒𝑔
+
+, 𝒙𝑡𝑟𝑎𝑖𝑛
+𝑟𝑒𝑔
+, 𝒙𝑡𝑒𝑠𝑡
+𝑟𝑒𝑔
+
+(11)
+over all the regression functions conditioned on (after observing)
+the training set. This conditioning operation is in a sense that, after
+generating functions from the GP prior, we filter out those that
+violate the training examples. After that, we sampled 100 functions
+(traces) from the posterior from Equation 11 and used them to make
+predictions on the test set. We report the average MSE of the 100
+functions, and such process is repeated for each fold of the cross-
+validation. We finally report the average performance over the 5
+folds in Figure 8. Our GP achieved an average MSE of 1.87 ± 0.14
+in predicting future anxiety scores 𝑦2.
+Analysis: to summarize, we evaluated the performance of our
+OLS, GB, and GP models for the anxiety prediction task with 5-fold
+stratified cross-validation. We selected 9 out of the 16 features that
+we extracted from online activities for this task.
+Our baseline model is the OLS regression, and it assumes the
+anxiety score 𝑦2 (dependent variable) is a linear function of the
+features (the independent variables). However, in reality, the rela-
+tionship between anxiety and online behaviors is not necessarily
+linear. In order to grant more flexibility, we trained a GB regressor
+which consists of an ensemble of weak learners and is built in a
+sequential manner. The intuition is that the next learner learns
+from the mistakes made by the previous one, and each subsequent
+learner minimizes the residual prediction loss by gradient descent.
+The GB regressor, with an average MSE of 2.29 ± 0.25, significantly
+outperforms the OLS, whose average MSE is 9.13 ± 3.65, in the
+anxiety prediction task (see column (a) of Figure 8).
+Finally, with an average MSE of 1.87 ± 0.14, GP outperforms
+both the OLS and GB (column (a) of Figure 8). Unlike OLS and GB,
+GP does not have any parametric form but is in a functional space
+with non-linearity. We assume a normal distribution for the future
+anxiety score 𝑦2 with the first-round anxiety score as the mean, and
+correlations between different 𝑦2 value predictions depends on the
+similarities between online activities 𝒙𝑔𝑝.
+There were 9 individuals whose ground truth GAD-7 anxiety
+scores changed by more than 5 between the first-round and the
+Figure 8: (a) The performances of OLS, GB, and GP on the
+anxiety prediction task. We carried out a standard stratified
+5-fold cross-validation first. (b) We then conducted another
+5-fold cross-validation but kept all the 9 subjects with sig-
+nificant changes in GAD-7 scores in the test set. The values
+after the ± sign represent the standard deviations.
+follow-up. A change in 5 of GAD-7 scores (ranging from 0 to 21)
+represents a change in anxiety level by around 23%, which can
+be clinically alarming. Thus, we conducted another 5-fold cross-
+validation but kept all these 9 subjects in the test set of each fold.
+We observed a good flexibility of 𝒙𝑟𝑒𝑔in capturing such significant
+changes in GAD-7 since the performances are comparable to the
+average scores for all models, see Figure 8, column (b).
+6
+DISCUSSION
+It has been reported that, every year, approximately 60% of all peo-
+ple with mental health conditions receive no treatment [38]. The
+inability to identify patients in need of care and deliver treatments
+on-time are major failure points in the current healthcare system.
+This is mainly because our current healthcare system entirely de-
+pends on people to self-report and actively present themselves to
+clinics for treatments. Relying entirely on patients for detecting and
+delivering care in a timely manner is quite challenging because pa-
+tients may be experiencing lack of motivations, feeling helpless and
+hopeless, fearing social stigmatization due to their condition, and
+concealing information, all of which may impair their judgements
+to seek help.
+In this paper, we ran a novel longitudinal study that collected
+ubiquitous online activities logs along with gold-standard clinically
+validated anxiety scores. Individual-level online activities history
+has been gathered from the YouTube and Google Search engine
+via the Google Takeout platform. We have developed explainable
+features that capture various semantic and temporal facets of online
+engagement logs, such as activity and inactivity patterns, content
+and time diversities. We have shown that these features are strong
+signals for not only detecting individuals with anxiety disorders
+but also estimating the severity of anxiety given any segment of
+online activity history. Given one’s online activities, our best per-
+forming Random Forest classifier can identify an individual with
+anxiety condition with an average F1 score of 0.83, average pre-
+cision and recall of 0.84, and average AUC of 0.90. Furthermore,
+we have demonstrated that anxiety scores can be predicted with
+high accuracy, with average MSE of 1.87, using Gaussian Process
+regressor. To the best of our knowledge, we are the first to study
+and demonstrate that it is feasible to identify whether one is experi-
+encing anxiety and estimate his/her/their exact anxiety score using
+individual-level YouTube and Google Search engine history logs.
+Our findings suggest the viability of constructing remote mental
+
+Woodstock ’18, June 03–05, 2018, Woodstock, NY
+Anis Zaman, Boyu Zhang, Henry Kautz, Vincent Silenzio, and Ehsan Hoque
+health surveillance frameworks based on passively sensed online
+data, which may be cheap, efficient, and bypasses the patient reluc-
+tance and information concealing dilemmas of traditional systems.
+Integration into Existing Healthcare Systems: the anxiety
+assessment framework presented in this paper can be initially set up
+in medical endpoints such as behavioral clinics. Therapists involved
+with patients suffering from various mental health conditions can
+use the output of the model as additional information about their
+patients. The predicted anxiety assessments can be leveraged to con-
+nect patients with the right counselor/expert. For example, someone
+may come to the clinic for a drug addiction problem and, follow-
+ing his/her/their informed consents, the counselor runs our model
+which outputs that the patient may have been experiencing severe
+anxiety during the last 4 week. In this case, our anxiety classifica-
+tion setup from Section 5.2 may be applicable. The patient may be
+flagged for review by designated members of the caregiver team
+who are specifically trained to handle patients with anxiety as well
+as addiction problems.
+Furthermore, our anxiety prediction setup from Section 5.3 can
+be used as a guideline to initiate specific treatment steps. Most
+importantly, counselors can use the model on a weekly basis to
+monitor anxiety levels of their patients remotely (based on their
+online engagements) in-between sessions/follow-up visits. This en-
+ables caregivers to note abnormal spikes in the estimated level of
+anxiety comparing to the last visit. Healthcare providers can then ei-
+ther schedule an immediate follow-up or use this information when
+engaging with the patient to uncover stressors and other issues
+that may otherwise go unmentioned during the next appointment.
+For example, a therapist could bring up the online behaviors of the
+patient during the past weekend, which were associated with high
+stress and anxiety symptoms, and ask if the patient agreed with the
+assessment. If so, what was happening in his/her/their lives at that
+time. Besides, such anxiety estimation setup is not one-shot fixed:
+it can and should be compared with professional clinical measures,
+as more patients came in, to help improve the future performance.
+Privacy & Ethical Considerations: Building an anxiety mon-
+itoring system using individual-level YouTube and Google Search
+engine activity logs presents a series of concerns around privacy
+and data safety. Due to the sensitive nature of the data collected in
+this study, it is important that appropriate human subject protection
+protocols are in place. Hence our study protocol has been rigorously
+reviewed and approved by the Institutional Review Board of our
+institution to address these concerns. Despite these measures, we
+acknowledge that ethical challenges may still arise if applications
+based on our methods are deployed in the real world.
+When someone uses platforms such as YouTube and Google
+Search engine, he/she/they never intend the personal data to be used
+by mental health assessment systems. Hence, some individuals may
+choose not to share their sensitive data and refuse to participate. It
+is important to ensure that participants, at all times, have the choice
+and control over their data and can choose to exclude themselves
+from such studies at will. Participants need to be explicitly informed
+about how their online engagement logs will be de-identified and
+analyzed, what type of information it may reveal about the user,
+and the accrued benefits to the patients and the therapists/care
+providers from mental health clinics. To address these concerns, we
+employed an opt-in model for volunteering study participation. In
+addition, we conducted one-on-one interviews for each participant
+during the recruitment procedure so that the research team can (a)
+take the time to clearly explain the purpose and the outcome of the
+study and (b) explicitly inform the participants about the existence
+of such sensitive data and how they reserve full control over the
+information shared such as limiting data access or deleting data.
+Yet, one big limitation of employing opt-in model is that it may
+significantly limit the number of volunteering participants for the
+study. Besides, the opt-in procedure may introduce participation
+bias in terms of study recruitment and the awareness of subjects.
+To limit recruitment bias, we have adapted generic wordings, such
+as “help us learn about mental health using online data”, in our study
+advertisements without specifically mentioning anxiety.
+Another remaining issue is that whether and when it is ethical
+to intervene in the life of an individual on the basis of online data
+signals associated with anxiety, which may not always be accurate.
+We believe that the ultimate decision regarding intervention must
+be made by therapists, care providers, and experts who understand
+both anxiety and the power and limitations of an automated anxiety
+assessment system.
+REFERENCES
+[1] Natalia Adler, Ciro Cattuto, Kyriaki Kalimeri, Daniela Paolotti, Michele Tizzoni,
+Stefaan Verhulst, Elad Yom-Tov, and Andrew Young. 2019. How search engine
+data enhance the understanding of determinants of suicide in India and inform
+prevention: observational study. Journal of medical Internet research 21, 1 (2019),
+e10179.
+[2] Judith Amores, Xavier Benavides, and Pattie Maes. 2016. Psychicvr: Increasing
+mindfulness by using virtual reality and brain computer interfaces. In Proceedings
+of the 2016 CHI Conference Extended Abstracts on Human Factors in Computing
+Systems. 2–2.
+[3] American College Health Association. 2018.
+American College Health
+Association-National College Health Assessment II: Undergraduate Student Ref-
+erence Group Data Report Fall 2018. https://www.acha.org/documents/ncha/
+NCHA-II_Fall_2018_Undergraduate_Reference_Group_Data_Report.pdf. Silver
+Spring, MD: American College Health Association (sep 2018).
+[4] John W Ayers, Benjamin M Althouse, Jon-Patrick Allem, J Niels Rosenquist, and
+Daniel E Ford. 2013. Seasonality in seeking mental health information on Google.
+American journal of preventive medicine 44, 5 (2013), 520–525.
+[5] Shrey Bagroy, Ponnurangam Kumaraguru, and Munmun De Choudhury. 2017. A
+social media based index of mental well-being in college campuses. In Proceedings
+of the 2017 CHI Conference on Human factors in Computing Systems. 1634–1646.
+[6] Julia Brailovskaia, Elke Rohmann, Hans-Werner Bierhoff, Jürgen Margraf, and
+Volker Köllner. 2019. Relationships between addictive Facebook use, depressive-
+ness, insomnia, and positive mental health in an inpatient sample: A German
+longitudinal study. Journal of Behavioral Addictions 8, 4 (2019), 703–713.
+[7] Susanna Calling, Patrik Midlöv, Sven-Erik Johansson, Kristina Sundquist, and
+Jan Sundquist. 2017. Longitudinal trends in self-reported anxiety. Effects of age
+and birth cohort during 25 years. BMC psychiatry 17, 1 (2017), 119.
+[8] Christopher Cayari. 2011. The YouTube Effect: How YouTube Has Provided New
+Ways to Consume, Create, and Share Music. International Journal of Education &
+the Arts 12, 6 (2011), n6.
+[9] Stevie Chancellor and Munmun De Choudhury. 2020. Methods in predictive
+techniques for mental health status on social media: a critical review. NPJ digital
+medicine 3, 1 (2020), 1–11.
+[10] Colleen S Conley, Jenna B Shapiro, Brynn M Huguenel, and Alexandra C Kirsch.
+2020.
+Navigating the college years: Developmental trajectories and gender
+differences in psychological functioning, cognitive-affective strategies, and social
+well-being. Emerging Adulthood 8, 2 (2020), 103–117.
+[11] Glen Coppersmith, Mark Dredze, and Craig Harman. 2014. Quantifying men-
+tal health signals in twitter. In Proceedings of the Workshop on Computational
+Linguistics and Clinical Psychology: From Linguistic Signal to Clinical Reality.
+51–60.
+[12] Glen Coppersmith, Mark Dredze, Craig Harman, Kristy Hollingshead, and Mar-
+garet Mitchell. 2015. CLPsych 2015 shared task: Depression and PTSD on Twitter.
+In Proceedings of the 2nd Workshop on Computational Linguistics and Clinical
+Psychology: From Linguistic Signal to Clinical Reality. 31–39.
+[13] Glen Coppersmith, Craig Harman, and Mark Dredze. 2014. Measuring post
+traumatic stress disorder in Twitter. In Eighth international AAAI conference on
+
+Individual-level Anxiety Detection and Prediction from Longitudinal YouTube and Google Search Engagement Logs
+Woodstock ’18, June 03–05, 2018, Woodstock, NY
+weblogs and social media.
+[14] E Jane Costello, Helen L Egger, and Adrian Angold. 2005. The developmental
+epidemiology of anxiety disorders: phenomenology, prevalence, and comorbidity.
+Child and Adolescent Psychiatric Clinics 14, 4 (2005), 631–648.
+[15] Munmun De Choudhury, Scott Counts, and Eric Horvitz. 2013. Social media as a
+measurement tool of depression in populations. In Proceedings of the 5th Annual
+ACM Web Science Conference. ACM, 47–56.
+[16] Munmun De Choudhury, Scott Counts, Eric J Horvitz, and Aaron Hoff. 2014.
+Characterizing and predicting postpartum depression from shared facebook data.
+In Proceedings of the 17th ACM conference on Computer supported cooperative
+work & social computing. 626–638.
+[17] Munmun De Choudhury, Michael Gamon, Scott Counts, and Eric Horvitz. 2013.
+Predicting Depression via Social Media.. In ICWSM. 2.
+[18] Munmun De Choudhury, Emre Kiciman, Mark Dredze, Glen Coppersmith, and
+Mrinal Kumar. 2016. Discovering shifts to suicidal ideation from mental health
+content in social media. In Proceedings of the 2016 CHI conference on human factors
+in computing systems. ACM, 2098–2110.
+[19] Jon D Elhai, Jason C Levine, and Brian J Hall. 2019. The relationship between
+anxiety symptom severity and problematic smartphone use: A review of the
+literature and conceptual frameworks. Journal of Anxiety Disorders 62 (2019),
+45–52.
+[20] Bethany KB Fleck, Lisa M Beckman, Jillian L Sterns, and Heather D Hussey.
+2014. YouTube in the classroom: Helpful tips and student perceptions. Journal of
+Effective Teaching 14, 3 (2014), 21–37.
+[21] Oren Gil-Or1, Yossi Levi-Belzm, and Ofir Turel. 2015. The “Facebook-self”: char-
+acteristics and psychological predictors of false self-presentation on Facebook.
+Frontiers in Psychology 6 (2015), 99.
+[22] Google. 2020. Content Categories. https://cloud.google.com/natural-language/
+docs/categories. [Online; accessed 12-May-2020].
+[23] Reshmi Gopalakrishna Pillai, Mike Thelwall, and Constantin Orasan. 2018. De-
+tection of stress and relaxation magnitudes for tweets. In Companion Proceedings
+of the The Web Conference 2018. 1677–1684.
+[24] John F Gunn III and David Lester. 2013. Using google searches on the internet to
+monitor suicidal behavior. Journal of affective disorders 148, 2 (2013), 411–412.
+[25] Alex S Hall and Jeffrey Parsons. 2001. Internet addiction: College student case
+study using best practices in cognitive behavior therapy. Journal of mental health
+counseling 23, 4 (2001), 312.
+[26] Alan G Hawkes. 1971. Spectra of some self-exciting and mutually exciting point
+processes. Biometrika 58, 1 (1971), 83–90.
+[27] Sue Jamison-Powell, Conor Linehan, Laura Daley, Andrew Garbett, and Shaun
+Lawson. 2012. I can’t get no sleep: discussing# insomnia on twitter. In Proceedings
+of the SIGCHI Conference on Human Factors in Computing Systems. ACM, 1501–
+1510.
+[28] Alberto Jimenez, Miguel-Angel Santed-Germán, and Victoria Ramos. 2020. Google
+searches and suicide rates in Spain, 2004-2013: correlation study. JMIR public
+health and surveillance 6, 2 (2020), e10919.
+[29] Andreas M Kaplan and Michael Haenlein. 2010. Users of the world, unite! The
+challenges and opportunities of Social Media. Business horizons 53, 1 (2010),
+59–68.
+[30] Andy Kiang and Joel Bailon. 2016. Data loss prevention (DLP) methods and
+architectures by a cloud service. US Patent 9,237,170.
+[31] Tae Wan Kim and Seung Tae Paek. 2016. Cloud data discovery method and
+system for private information protection and data loss prevention in enterprise
+cloud service environment. US Patent App. 14/728,503.
+[32] Jane E Klobas, Tanya J McGill, Sedigheh Moghavvemi, and Tanousha Para-
+manathan. 2018. Compulsive YouTube usage: A comparison of use motivation
+and personality effects. Computers in Human Behavior 87 (2018), 129–139.
+[33] Robert LiKamWa, Yunxin Liu, Nicholas D Lane, and Lin Zhong. 2013. Moodscope:
+Building a mood sensor from smartphone usage patterns. In Proceeding of the
+11th annual international conference on Mobile systems, applications, and services.
+389–402.
+[34] Yuanchao Ma, Bin Xu, Yin Bai, Guodong Sun, and Run Zhu. 2012. Daily mood
+assessment based on mobile phone sensing. In 2012 ninth international conference
+on wearable and implantable body sensor networks. IEEE, 142–147.
+[35] Diana MacLean, Asta Roseway, and Mary Czerwinski. 2013. MoodWings: a
+wearable biofeedback device for real-time stress intervention. In Proceedings
+of the 6th international conference on PErvasive Technologies Related to Assistive
+Environments. 1–8.
+[36] Michael J McCarthy. 2010. Internet monitoring of suicide risk in the population.
+Journal of affective disorders 122, 3 (2010), 277–279.
+[37] Sedigheh Moghavvemi, Ainin Binti Sulaiman, Noor Ismawati Binti Jaafar, and
+Nafisa Kasem. 2017. Facebook and YouTube addiction: the usage pattern of
+Malaysian students. In 2017 international conference on research and innovation
+in information systems (ICRIIS). IEEE, 1–6.
+[38] David C Mohr, Mi Zhang, and Stephen M Schueller. 2017. Personal sensing:
+understanding mental health using ubiquitous sensors and machine learning.
+Annual review of clinical psychology 13 (2017), 23–47.
+[39] Amir Muaremi, Bert Arnrich, and Gerhard Tröster. 2013. Towards measuring
+stress with smartphones and wearable devices during workday and sleep. Bio-
+NanoScience 3, 2 (2013), 172–183.
+[40] Tahir M Nisar, Guru Prabhakar, P Vigneswara Ilavarasan, and Abdullah M Baab-
+dullah. 2019. Facebook usage and mental health: An empirical study of role of
+non-directional social comparisons in the UK. International Journal of Information
+Management 48 (2019), 53–62.
+[41] Sudhakar V Nuti, Brian Wayda, Isuru Ranasinghe, Sisi Wang, Rachel P Dreyer,
+Serene I Chen, and Karthik Murugiah. 2014. The use of google trends in health
+care research: a systematic review. PloS one 9, 10 (2014), e109583.
+[42] Y Ophir, CSC Asterhan, and BB Schwarz. 2020. If these Facebook walls could
+talk: Detecting and treating teenage psycho-social stress through social network
+activity (in Hebrew). Breaking down barriers? Teachers, students and social network
+sites (2020).
+[43] John Paparrizos, Ryen W White, and Eric Horvitz. 2016. Detecting devastating
+diseases in search logs. In Proceedings of the 22nd ACM SIGKDD International
+Conference on Knowledge Discovery and Data Mining. ACM, 559–568.
+[44] John Paparrizos, Ryen W White, and Eric Horvitz. 2016. Screening for pancreatic
+adenocarcinoma using signals from web search logs: Feasibility study and results.
+Journal of Oncology Practice 12, 8 (2016), 737–744.
+[45] Pablo Paredes and Matthew Chan. 2011. CalmMeNow: exploratory research and
+design of stress mitigating mobile interventions. In CHI’11 Extended Abstracts on
+Human Factors in Computing Systems. 1699–1704.
+[46] Ted Pedersen. 2015. Screening Twitter users for depression and PTSD with lexical
+decision lists. In Proceedings of the 2nd workshop on computational linguistics and
+clinical psychology: from linguistic signal to clinical reality. 46–53.
+[47] Skyler Place, Danielle Blanch-Hartigan, Channah Rubin, Cristina Gorrostieta,
+Caroline Mead, John Kane, Brian P Marx, Joshua Feast, Thilo Deckersbach, An-
+drew Nierenberg, et al. 2017. Behavioral indicators on a mobile sensing platform
+predict clinically validated psychiatric symptoms of mood and anxiety disorders.
+Journal of medical Internet research 19, 3 (2017), e75.
+[48] Christine Purdon, Martin Antony, Sandra Monteiro, and Richard P Swinson.
+2001. Social anxiety in college students. Journal of Anxiety Disorders 15, 3 (2001),
+203–215.
+[49] Andrew G Reece, Andrew J Reagan, Katharina LM Lix, Peter Sheridan Dodds,
+Christopher M Danforth, and Ellen J Langer. 2017. Forecasting the onset and
+course of mental illness with Twitter data. Scientific reports 7, 1 (2017), 1–11.
+[50] Philip Resnik, William Armstrong, Leonardo Claudino, Thang Nguyen, Viet-An
+Nguyen, and Jordan Boyd-Graber. 2015. Beyond LDA: exploring supervised topic
+modeling for depression-related language in Twitter. In Proceedings of the 2nd
+Workshop on Computational Linguistics and Clinical Psychology: From Linguistic
+Signal to Clinical Reality. 99–107.
+[51] MILES RICHARDSON, ZAHEER HUSSAIN, and MARK D GRIFFITHS. 2018.
+Problematic smartphone use, nature connectedness, and anxiety. Journal of
+Behavioral Addictions 7, 1 (2018), 109–116.
+[52] Marian-Andrei Rizoiu, Young Lee, Swapnil Mishra, and Lexing Xie. 2017. Hawkes
+processes for events in social media. In Frontiers of Multimedia Research. 191–218.
+[53] Sohrab Saeb, Emily G Lattie, Stephen M Schueller, Konrad P Kording, and David C
+Mohr. 2016. The relationship between mobile phone location sensor data and
+depressive symptom severity. PeerJ 4 (2016), e2537.
+[54] Sohrab Saeb, Mi Zhang, Christopher J Karr, Stephen M Schueller, Marya E Corden,
+Konrad P Kording, and David C Mohr. 2015. Mobile phone sensor correlates of
+depressive symptom severity in daily-life behavior: an exploratory study. Journal
+of medical Internet research 17, 7 (2015), e175.
+[55] Akane Sano and Rosalind W Picard. 2013. Stress recognition using wearable
+sensors and mobile phones. In 2013 Humaine Association Conference on Affective
+Computing and Intelligent Interaction. IEEE, 671–676.
+[56] H Andrew Schwartz, Johannes Eichstaedt, Margaret Kern, Gregory Park, Maarten
+Sap, David Stillwell, Michal Kosinski, and Lyle Ungar. 2014. Towards assessing
+changes in degree of depression through facebook. In Proceedings of the workshop
+on computational linguistics and clinical psychology: from linguistic signal to
+clinical reality. 118–125.
+[57] Elizabeth M Seabrook, Margaret L Kern, and Nikki S Rickard. 2016. Social
+networking sites, depression, and anxiety: a systematic review. JMIR mental
+health 3, 4 (2016), e50.
+[58] Peter S Shenkin, Batu Erman, and Lucy D Mastrandrea. 1991. Information-
+theoretical entropy as a measure of sequence variability. Proteins: Structure,
+Function, and Bioinformatics 11, 4 (1991), 297–313.
+[59] Robert L Spitzer, Kurt Kroenke, Janet BW Williams, and Bernd Löwe. 2006. A
+brief measure for assessing generalized anxiety disorder: the GAD-7. Archives of
+internal medicine 166, 10 (2006), 1092–1097.
+[60] Hajime Sueki. 2011. Does the volume of Internet searches using suicide-related
+search terms influence the suicide death rate: Data from 2004 to 2009 in Japan.
+Psychiatry and clinical neurosciences 65, 4 (2011), 392–394.
+[61] RP Swinson. 2006. The GAD-7 scale was accurate for diagnosing generalised
+anxiety disorder. Evidence-based medicine 11, 6 (2006), 184.
+[62] TechPostPlus. 2019.
+YouTube video Categories list FAQs and solu-
+tions. https://techpostplus.com/2019/04/26/youtube-video-categories-list-faqs-
+
+Woodstock ’18, June 03–05, 2018, Woodstock, NY
+Anis Zaman, Boyu Zhang, Henry Kautz, Vincent Silenzio, and Ehsan Hoque
+and-solutions/. [Online; accessed 26-April-2019].
+[63] The Next Web. 2020. Digital trends 2020: Every single stat you need to know about
+the internet. https://thenextweb.com/podium/2020/01/30/digital-trends-2020-
+every-single-stat-you-need-to-know-about-the-internet. Accessed: 2020-02-07.
+[64] Sho Tsugawa, Yusuke Kikuchi, Fumio Kishino, Kosuke Nakajima, Yuichi Itoh,
+and Hiroyuki Ohsaki. 2015. Recognizing depression from twitter activity. In
+Proceedings of the 33rd annual ACM conference on human factors in computing
+systems. 3187–3196.
+[65] Rui Wang, Fanglin Chen, Zhenyu Chen, Tianxing Li, Gabriella Harari, Stefanie
+Tignor, Xia Zhou, Dror Ben-Zeev, and Andrew T Campbell. 2014. StudentLife:
+assessing mental health, academic performance and behavioral trends of college
+students using smartphones. In Proceedings of the 2014 ACM international joint
+conference on pervasive and ubiquitous computing. 3–14.
+[66] Rui Wang, Weichen Wang, Alex DaSilva, Jeremy F Huckins, William M Kelley,
+Todd F Heatherton, and Andrew T Campbell. 2018. Tracking depression dynamics
+in college students using mobile phone and wearable sensing. Proceedings of
+the ACM on Interactive, Mobile, Wearable and Ubiquitous Technologies 2, 1 (2018),
+1–26.
+[67] Harvey A Whiteford, Louisa Degenhardt, Jürgen Rehm, Amanda J Baxter, Alize J
+Ferrari, Holly E Erskine, Fiona J Charlson, Rosana E Norman, Abraham D Flaxman,
+Nicole Johns, et al. 2013. Global burden of disease attributable to mental and
+substance use disorders: findings from the Global Burden of Disease Study 2010.
+The lancet 382, 9904 (2013), 1575–1586.
+[68] Christopher KI Williams and Carl Edward Rasmussen. 2006. Gaussian processes
+for machine learning. Vol. 2. MIT press Cambridge, MA.
+[69] Nerys Williams. 2014. The GAD-7 questionnaire. Occupational medicine 64, 3
+(2014), 224–224.
+[70] Albert C Yang, Shi-Jen Tsai, Norden E Huang, and Chung-Kang Peng. 2011.
+Association of Internet search trends with suicide death in Taipei City, Taiwan,
+2004–2009. Journal of affective disorders 132, 1 (2011), 179–184.
+[71] Anis Zaman, Rupam Acharyya, Henry Kautz, and Vincent Silenzio. 2019. Detect-
+ing Low Self-Esteem in Youths from Web Search Data. In The World Wide Web
+Conference. 2270–2280.
+[72] Melvyn WB Zhang, Cyrus SH Ho, Christopher CS Cheok, and Roger CM Ho.
+2015. Smartphone apps in mental healthcare: the state of the art and potential
+developments. BJPsych advances 21, 5 (2015), 354–358.
